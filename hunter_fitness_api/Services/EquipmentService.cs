@@ -21,13 +21,16 @@ namespace HunterFitness.API.Services
     {
         private readonly HunterFitnessDbContext _context;
         private readonly ILogger<EquipmentService> _logger;
+        private readonly IHunterService _hunterService;
 
         public EquipmentService(
             HunterFitnessDbContext context,
-            ILogger<EquipmentService> logger)
+            ILogger<EquipmentService> logger,
+            IHunterService hunterService)
         {
             _context = context;
             _logger = logger;
+            _hunterService = hunterService;
         }
 
         public async Task<HunterInventoryDto> GetHunterInventoryAsync(Guid hunterId)
@@ -265,13 +268,14 @@ namespace HunterFitness.API.Services
                 var ownedEquipmentIds = await _context.HunterEquipment
                     .Where(he => he.HunterID == hunterId)
                     .Select(he => he.EquipmentID)
-                    .ToHashSetAsync();
+                    .ToListAsync();
+                var ownedEquipmentIdsSet = ownedEquipmentIds.ToHashSet();
 
                 var equipmentDtos = new List<EquipmentDto>();
 
                 foreach (var equipment in allEquipment)
                 {
-                    var isOwned = ownedEquipmentIds.Contains(equipment.EquipmentID);
+                    var isOwned = ownedEquipmentIdsSet.Contains(equipment.EquipmentID);
                     var isEquipped = false;
                     var unlockedAt = (DateTime?)null;
                     var isNewlyUnlocked = false;
@@ -522,7 +526,7 @@ namespace HunterFitness.API.Services
             };
         }
 
-        private string FormatTimeOwned(TimeSpan timeOwned)
+        private static string FormatTimeOwned(TimeSpan timeOwned)
         {
             if (timeOwned.TotalDays >= 1)
                 return $"{(int)timeOwned.TotalDays} days ago";
@@ -534,7 +538,7 @@ namespace HunterFitness.API.Services
                 return "Just unlocked";
         }
 
-        private decimal GetInventoryCompletionPercentage(HunterInventoryDto inventory)
+        private static decimal GetInventoryCompletionPercentage(HunterInventoryDto inventory)
         {
             if (inventory.TotalItems == 0) return 0m;
             
