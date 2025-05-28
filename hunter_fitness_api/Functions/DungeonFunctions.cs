@@ -5,6 +5,7 @@ using System.Net;
 using System.Text.Json;
 using HunterFitness.API.Services;
 using HunterFitness.API.DTOs;
+using HunterFitness.API.Models;
 
 namespace HunterFitness.API.Functions
 {
@@ -12,18 +13,15 @@ namespace HunterFitness.API.Functions
     {
         private readonly IDungeonService _dungeonService;
         private readonly IAuthService _authService;
-        private readonly IAchievementService _achievementService;
         private readonly ILogger<DungeonFunctions> _logger;
 
         public DungeonFunctions(
             IDungeonService dungeonService,
             IAuthService authService,
-            IAchievementService achievementService,
             ILogger<DungeonFunctions> logger)
         {
             _dungeonService = dungeonService;
             _authService = authService;
-            _achievementService = achievementService;
             _logger = logger;
         }
 
@@ -247,18 +245,6 @@ namespace HunterFitness.API.Functions
 
                 var result = await _dungeonService.CompleteRaidAsync(hunter.HunterID, completeDto);
 
-                // Si el raid fue exitoso, verificar achievements
-                if (result.Success && completeDto.Successful)
-                {
-                    var newAchievements = await _achievementService.CheckAndUpdateAchievementsAsync(
-                        hunter.HunterID, "dungeon_completed");
-                    
-                    if (newAchievements.Any())
-                    {
-                        result.Metadata["NewAchievements"] = newAchievements.Select(a => a.AchievementName).ToList();
-                    }
-                }
-
                 var statusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
                 var response = req.CreateResponse(statusCode);
                 
@@ -395,7 +381,7 @@ namespace HunterFitness.API.Functions
         }
 
         // Helper methods
-        private async Task<Models.Hunter?> GetHunterFromToken(HttpRequestData req)
+        private async Task<Hunter?> GetHunterFromToken(HttpRequestData req)
         {
             try
             {

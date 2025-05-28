@@ -20,16 +20,13 @@ namespace HunterFitness.API.Services
     {
         private readonly HunterFitnessDbContext _context;
         private readonly ILogger<AchievementService> _logger;
-        private readonly IHunterService _hunterService;
 
         public AchievementService(
             HunterFitnessDbContext context,
-            ILogger<AchievementService> logger,
-            IHunterService hunterService)
+            ILogger<AchievementService> logger)
         {
             _context = context;
             _logger = logger;
-            _hunterService = hunterService;
         }
 
         public async Task<HunterAchievementsDto> GetHunterAchievementsAsync(Guid hunterId)
@@ -109,6 +106,206 @@ namespace HunterFitness.API.Services
                     NearCompletion = nearCompletion,
                     UnlockedTitles = unlockedTitles
                 };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "💀 Error getting hunter achievements: {HunterID}", hunterId);
+                throw;
+            }
+        }
+
+        public async Task<List<AchievementDto>> GetAvailableAchievementsAsync(Guid hunterId)
+        {
+            try
+            {
+                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
+                if (hunter == null) return new List<AchievementDto>();
+
+                var achievements = await _context.Achievements
+                    .Where(a => a.IsActive && !a.IsHidden)
+                    .OrderBy(a => a.Category)
+                    .ThenBy(a => a.AchievementName)
+                    .ToListAsync();
+
+                var hunterAchievements = await _context.HunterAchievements
+                    .Where(ha => ha.HunterID == hunterId)
+                    .ToDictionaryAsync(ha => ha.AchievementID);
+
+                var achievementDtos = new List<AchievementDto>();
+
+                foreach (var achievement in achievements)
+                {
+                    hunterAchievements.TryGetValue(achievement.AchievementID, out var hunterAchievement);
+                    var dto = ConvertToAchievementDto(achievement, hunterAchievement, hunter);
+                    achievementDtos.Add(dto);
+                }
+
+                return achievementDtos;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "💀 Error getting available achievements for hunter: {HunterID}", hunterId);
+                return new List<AchievementDto>();
+            }
+        }
+
+        public async Task<List<AchievementDto>> CheckAndUpdateAchievementsAsync(Guid hunterId, string eventType, int incrementValue = 1)
+        {
+            try
+            {
+                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
+                if (hunter == null) return new List<AchievementDto>();
+
+                var newlyUnlockedAchievements = new List<AchievementDto>();
+
+                // Obtener achievements relevantes al evento
+                var relevantAchievements = await GetRelevantAchievements(eventType);
+
+                foreach (var achievement in relevantAchievements)
+                {
+                    var hunterAchievement = await _context.HunterAchievements
+                        .FirstOrDefaultAsync(ha => ha.HunterID == hunterId && ha.AchievementID == achievement.AchievementID);
+
+                    if (hunterAchievement == null)
+                    {
+                        // Crear nueva entrada si no existe
+                        hunterAchievement = new HunterAchievement
+                        {
+                            HunterID = hunterId,
+                            AchievementID = achievement.AchievementID,
+                            CurrentProgress = 0
+                        };
+                        _context.HunterAchievements.Add(hunterAchievement);
+                    }
+
+                    if (hunterAchievement.IsUnlocked) continue;
+
+                    var oldProgress = hunterAchievement.CurrentProgress;
+
+                    // Actualizar progreso basado en el tipo de achievement
+                    switch (achievement.AchievementType)
+                    {
+                        case "Counter":
+                            hunterAchievement.IncrementProgress(incrementValue);
+                            break;
+
+                        case "Streak":
+                            // Para streaks, el valor actual debería venir del hunter
+                            if (eventType == "workout_completed")
+                            {
+                                hunterAchievement.UpdateProgress(hunter.DailyStreak);
+                            }
+                            break;
+
+                        case "Single":
+                            // Achievements únicos se desbloquean inmediatamente
+                            hunterAchievement.UnlockAchievement();
+                            break;
+
+                        case "Progressive":
+                            hunterAchievement.IncrementProgress(incrementValue);
+                            break;
+                    }
+
+                    // Verificar si se desbloqueó
+                    if (hunterAchievement.IsUnlocked && oldProgress < (achievement.TargetValue ?? 1))
+                    {
+                        // Achievement recién desbloqueado - agregar XP
+                        hunter.CurrentXP += achievement.XPReward;
+                        hunter.TotalXP += achievement.XPReward;
+                        
+                        var dto = ConvertToAchievementDto(achievement, hunterAchievement, hunter);
+                        newlyUnlockedAchievements.Add(dto);
+
+                        _logger.LogInformation("🏆 Achievement unlocked: {AchievementName} by Hunter {HunterID} - XP: {XP}", 
+                            achievement.AchievementName, hunterId, achievement.XPReward);
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                return newlyUnlockedAchievements;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "💀 Error checking achievements for hunter: {HunterID}, Event: {EventType}", 
+                    hunterId, eventType);
+                return new List<AchievementDto>();
+            }
+        }
+
+        public async Task<bool> UnlockAchievementAsync(Guid hunterId, Guid achievementId)
+        {
+            try
+            {
+                var achievement = await _context.Achievements.FirstOrDefaultAsync(a => a.AchievementID == achievementId && a.IsActive);
+                if (achievement == null) return false;
+
+                var hunterAchievement = await _context.HunterAchievements
+                    .FirstOrDefaultAsync(ha => ha.HunterID == hunterId && ha.AchievementID == achievementId);
+
+                if (hunterAchievement == null)
+                {
+                    hunterAchievement = new HunterAchievement
+                    {
+                        HunterID = hunterId,
+                        AchievementID = achievementId
+                    };
+                    _context.HunterAchievements.Add(hunterAchievement);
+                }
+
+                if (hunterAchievement.IsUnlocked) return true; // Ya desbloqueado
+
+                hunterAchievement.UnlockAchievement();
+                
+                // Otorgar XP al hunter
+                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId);
+                if (hunter != null)
+                {
+                    hunter.CurrentXP += achievement.XPReward;
+                    hunter.TotalXP += achievement.XPReward;
+                }
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("🏆 Achievement manually unlocked: {AchievementName} for Hunter {HunterID}", 
+                    achievement.AchievementName, hunterId);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "💀 Error unlocking achievement: {AchievementID} for Hunter {HunterID}", 
+                    achievementId, hunterId);
+                return false;
+            }
+        }
+
+        public async Task<List<AchievementDto>> GetAchievementsByCategoryAsync(string category, Guid hunterId)
+        {
+            try
+            {
+                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
+                if (hunter == null) return new List<AchievementDto>();
+
+                var achievements = await _context.Achievements
+                    .Where(a => a.IsActive && a.Category == category)
+                    .OrderBy(a => a.AchievementName)
+                    .ToListAsync();
+
+                var hunterAchievements = await _context.HunterAchievements
+                    .Where(ha => ha.HunterID == hunterId)
+                    .ToDictionaryAsync(ha => ha.AchievementID);
+
+                var achievementDtos = new List<AchievementDto>();
+
+                foreach (var achievement in achievements)
+                {
+                    hunterAchievements.TryGetValue(achievement.AchievementID, out var hunterAchievement);
+                    var dto = ConvertToAchievementDto(achievement, hunterAchievement, hunter);
+                    achievementDtos.Add(dto);
+                }
+
+                return achievementDtos;
             }
             catch (Exception ex)
             {
@@ -282,197 +479,4 @@ namespace HunterFitness.API.Services
             return inProgressAchievements.Average(a => a.ProgressPercentage);
         }
     }
-}Error getting hunter achievements: {HunterID}", hunterId);
-                throw;
-            }
-        }
-
-        public async Task<List<AchievementDto>> GetAvailableAchievementsAsync(Guid hunterId)
-        {
-            try
-            {
-                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
-                if (hunter == null) return new List<AchievementDto>();
-
-                var achievements = await _context.Achievements
-                    .Where(a => a.IsActive && !a.IsHidden)
-                    .OrderBy(a => a.Category)
-                    .ThenBy(a => a.AchievementName)
-                    .ToListAsync();
-
-                var hunterAchievements = await _context.HunterAchievements
-                    .Where(ha => ha.HunterID == hunterId)
-                    .ToDictionaryAsync(ha => ha.AchievementID);
-
-                var achievementDtos = new List<AchievementDto>();
-
-                foreach (var achievement in achievements)
-                {
-                    hunterAchievements.TryGetValue(achievement.AchievementID, out var hunterAchievement);
-                    var dto = ConvertToAchievementDto(achievement, hunterAchievement, hunter);
-                    achievementDtos.Add(dto);
-                }
-
-                return achievementDtos;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "💀 Error getting available achievements for hunter: {HunterID}", hunterId);
-                return new List<AchievementDto>();
-            }
-        }
-
-        public async Task<List<AchievementDto>> CheckAndUpdateAchievementsAsync(Guid hunterId, string eventType, int incrementValue = 1)
-        {
-            try
-            {
-                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
-                if (hunter == null) return new List<AchievementDto>();
-
-                var newlyUnlockedAchievements = new List<AchievementDto>();
-
-                // Obtener achievements relevantes al evento
-                var relevantAchievements = await GetRelevantAchievements(eventType);
-
-                foreach (var achievement in relevantAchievements)
-                {
-                    var hunterAchievement = await _context.HunterAchievements
-                        .FirstOrDefaultAsync(ha => ha.HunterID == hunterId && ha.AchievementID == achievement.AchievementID);
-
-                    if (hunterAchievement == null)
-                    {
-                        // Crear nueva entrada si no existe
-                        hunterAchievement = new HunterAchievement
-                        {
-                            HunterID = hunterId,
-                            AchievementID = achievement.AchievementID,
-                            CurrentProgress = 0
-                        };
-                        _context.HunterAchievements.Add(hunterAchievement);
-                    }
-
-                    if (hunterAchievement.IsUnlocked) continue;
-
-                    var oldProgress = hunterAchievement.CurrentProgress;
-
-                    // Actualizar progreso basado en el tipo de achievement
-                    switch (achievement.AchievementType)
-                    {
-                        case "Counter":
-                            hunterAchievement.IncrementProgress(incrementValue);
-                            break;
-
-                        case "Streak":
-                            // Para streaks, el valor actual debería venir del hunter
-                            if (eventType == "workout_completed")
-                            {
-                                hunterAchievement.UpdateProgress(hunter.DailyStreak);
-                            }
-                            break;
-
-                        case "Single":
-                            // Achievements únicos se desbloquean inmediatamente
-                            hunterAchievement.UnlockAchievement();
-                            break;
-
-                        case "Progressive":
-                            hunterAchievement.IncrementProgress(incrementValue);
-                            break;
-                    }
-
-                    // Verificar si se desbloqueó
-                    if (hunterAchievement.IsUnlocked && oldProgress < (achievement.TargetValue ?? 1))
-                    {
-                        // Achievement recién desbloqueado
-                        await _hunterService.AddXPAsync(hunterId, achievement.XPReward, $"Achievement: {achievement.AchievementName}");
-                        
-                        var dto = ConvertToAchievementDto(achievement, hunterAchievement, hunter);
-                        newlyUnlockedAchievements.Add(dto);
-
-                        _logger.LogInformation("🏆 Achievement unlocked: {AchievementName} by Hunter {HunterID} - XP: {XP}", 
-                            achievement.AchievementName, hunterId, achievement.XPReward);
-                    }
-                }
-
-                await _context.SaveChangesAsync();
-                return newlyUnlockedAchievements;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "💀 Error checking achievements for hunter: {HunterID}, Event: {EventType}", 
-                    hunterId, eventType);
-                return new List<AchievementDto>();
-            }
-        }
-
-        public async Task<bool> UnlockAchievementAsync(Guid hunterId, Guid achievementId)
-        {
-            try
-            {
-                var achievement = await _context.Achievements.FirstOrDefaultAsync(a => a.AchievementID == achievementId && a.IsActive);
-                if (achievement == null) return false;
-
-                var hunterAchievement = await _context.HunterAchievements
-                    .FirstOrDefaultAsync(ha => ha.HunterID == hunterId && ha.AchievementID == achievementId);
-
-                if (hunterAchievement == null)
-                {
-                    hunterAchievement = new HunterAchievement
-                    {
-                        HunterID = hunterId,
-                        AchievementID = achievementId
-                    };
-                    _context.HunterAchievements.Add(hunterAchievement);
-                }
-
-                if (hunterAchievement.IsUnlocked) return true; // Ya desbloqueado
-
-                hunterAchievement.UnlockAchievement();
-                await _context.SaveChangesAsync();
-
-                // Otorgar XP
-                await _hunterService.AddXPAsync(hunterId, achievement.XPReward, $"Achievement: {achievement.AchievementName}");
-
-                _logger.LogInformation("🏆 Achievement manually unlocked: {AchievementName} for Hunter {HunterID}", 
-                    achievement.AchievementName, hunterId);
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "💀 Error unlocking achievement: {AchievementID} for Hunter {HunterID}", 
-                    achievementId, hunterId);
-                return false;
-            }
-        }
-
-        public async Task<List<AchievementDto>> GetAchievementsByCategoryAsync(string category, Guid hunterId)
-        {
-            try
-            {
-                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
-                if (hunter == null) return new List<AchievementDto>();
-
-                var achievements = await _context.Achievements
-                    .Where(a => a.IsActive && a.Category == category)
-                    .OrderBy(a => a.AchievementName)
-                    .ToListAsync();
-
-                var hunterAchievements = await _context.HunterAchievements
-                    .Where(ha => ha.HunterID == hunterId)
-                    .ToDictionaryAsync(ha => ha.AchievementID);
-
-                var achievementDtos = new List<AchievementDto>();
-
-                foreach (var achievement in achievements)
-                {
-                    hunterAchievements.TryGetValue(achievement.AchievementID, out var hunterAchievement);
-                    var dto = ConvertToAchievementDto(achievement, hunterAchievement, hunter);
-                    achievementDtos.Add(dto);
-                }
-
-                return achievementDtos;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "💀
+}

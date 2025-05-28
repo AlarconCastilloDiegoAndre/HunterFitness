@@ -22,16 +22,13 @@ namespace HunterFitness.API.Services
     {
         private readonly HunterFitnessDbContext _context;
         private readonly ILogger<QuestService> _logger;
-        private readonly IHunterService _hunterService;
 
         public QuestService(
             HunterFitnessDbContext context, 
-            ILogger<QuestService> logger,
-            IHunterService hunterService)
+            ILogger<QuestService> logger)
         {
             _context = context;
             _logger = logger;
-            _hunterService = hunterService;
         }
 
         public async Task<DailyQuestsSummaryDto> GetDailyQuestsAsync(Guid hunterId, DateTime? questDate = null)
@@ -273,13 +270,17 @@ namespace HunterFitness.API.Services
                 _context.QuestHistory.Add(questHistory);
 
                 // Agregar XP al hunter
-                await _hunterService.AddXPAsync(hunterId, hunterQuest.XPEarned, $"Quest: {hunterQuest.Quest.QuestName}");
+                var hunter = hunterQuest.Hunter;
+                hunter.CurrentXP += hunterQuest.XPEarned;
+                hunter.TotalXP += hunterQuest.XPEarned;
+                hunter.TotalWorkouts++;
 
-                // Incrementar contador de workouts
-                await _hunterService.IncrementWorkoutCountAsync(hunterId);
-
-                // Actualizar streak (simplificado - en producción sería más complejo)
-                await _hunterService.UpdateStreakAsync(hunterId, true);
+                // Actualizar streak (simplificado)
+                hunter.DailyStreak++;
+                if (hunter.DailyStreak > hunter.LongestStreak)
+                {
+                    hunter.LongestStreak = hunter.DailyStreak;
+                }
 
                 await _context.SaveChangesAsync();
 

@@ -21,16 +21,13 @@ namespace HunterFitness.API.Services
     {
         private readonly HunterFitnessDbContext _context;
         private readonly ILogger<EquipmentService> _logger;
-        private readonly IHunterService _hunterService;
 
         public EquipmentService(
             HunterFitnessDbContext context,
-            ILogger<EquipmentService> logger,
-            IHunterService hunterService)
+            ILogger<EquipmentService> logger)
         {
             _context = context;
             _logger = logger;
-            _hunterService = hunterService;
         }
 
         public async Task<HunterInventoryDto> GetHunterInventoryAsync(Guid hunterId)
@@ -169,7 +166,8 @@ namespace HunterFitness.API.Services
 
                 await _context.SaveChangesAsync();
 
-                var updatedStats = await _hunterService.GetHunterStatsAsync(hunterId);
+                // Obtener stats actualizados
+                var updatedStats = await GetHunterStatsForResponse(hunterId);
 
                 _logger.LogInformation("⚔️ Equipment equipped: {ItemName} by Hunter {HunterID}", 
                     hunterEquipment.Equipment.ItemName, hunterId);
@@ -225,7 +223,7 @@ namespace HunterFitness.API.Services
                 hunterEquipment.UnequipItem();
                 await _context.SaveChangesAsync();
 
-                var updatedStats = await _hunterService.GetHunterStatsAsync(hunterId);
+                var updatedStats = await GetHunterStatsForResponse(hunterId);
 
                 _logger.LogInformation("📦 Equipment unequipped: {ItemName} by Hunter {HunterID}", 
                     hunterEquipment.Equipment.ItemName, hunterId);
@@ -260,7 +258,6 @@ namespace HunterFitness.API.Services
                 var allEquipment = await _context.Equipment
                     .Where(e => e.IsActive)
                     .OrderBy(e => e.ItemType)
-                    .ThenBy(e => e.GetRarityValue())
                     .ThenBy(e => e.UnlockLevel)
                     .ToListAsync();
 
@@ -478,6 +475,50 @@ namespace HunterFitness.API.Services
                 IconUrl = hunterEquipment.Equipment.IconUrl,
                 SpecialEffects = hunterEquipment.Equipment.GetSpecialEffects(),
                 FlavorText = hunterEquipment.Equipment.GetFlavorText()
+            };
+        }
+
+        private async Task<HunterStatsDto> GetHunterStatsForResponse(Guid hunterId)
+        {
+            var hunter = await _context.Hunters
+                .Include(h => h.Equipment.Where(e => e.IsEquipped))
+                    .ThenInclude(e => e.Equipment)
+                .FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
+
+            if (hunter == null)
+            {
+                throw new ArgumentException("Hunter not found");
+            }
+
+            var equippedItems = hunter.Equipment?.Where(e => e.IsEquipped && e.Equipment != null) ?? new List<HunterEquipment>();
+            
+            var strengthBonus = equippedItems.Sum(e => e.Equipment?.StrengthBonus ?? 0);
+            var agilityBonus = equippedItems.Sum(e => e.Equipment?.AgilityBonus ?? 0);
+            var vitalityBonus = equippedItems.Sum(e => e.Equipment?.VitalityBonus ?? 0);
+            var enduranceBonus = equippedItems.Sum(e => e.Equipment?.EnduranceBonus ?? 0);
+            var xpMultiplier = equippedItems.Where(e => e.Equipment != null).Sum(e => e.Equipment.XPMultiplier - 1.0m) + 1.0m;
+
+            return new HunterStatsDto
+            {
+                HunterID = hunter.HunterID,
+                HunterName = hunter.HunterName,
+                Level = hunter.Level,
+                HunterRank = hunter.HunterRank,
+                BaseStrength = hunter.Strength,
+                BaseAgility = hunter.Agility,
+                BaseVitality = hunter.Vitality,
+                BaseEndurance = hunter.Endurance,
+                TotalStrength = hunter.Strength + strengthBonus,
+                TotalAgility = hunter.Agility + agilityBonus,
+                TotalVitality = hunter.Vitality + vitalityBonus,
+                TotalEndurance = hunter.Endurance + enduranceBonus,
+                StrengthBonus = strengthBonus,
+                AgilityBonus = agilityBonus,
+                VitalityBonus = vitalityBonus,
+                EnduranceBonus = enduranceBonus,
+                TotalStatsBase = hunter.Strength + hunter.Agility + hunter.Vitality + hunter.Endurance,
+                TotalStatsWithEquipment = hunter.GetTotalStatsWithEquipment(),
+                XPMultiplier = xpMultiplier
             };
         }
 

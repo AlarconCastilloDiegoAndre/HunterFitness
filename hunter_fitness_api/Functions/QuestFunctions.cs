@@ -5,6 +5,7 @@ using System.Net;
 using System.Text.Json;
 using HunterFitness.API.Services;
 using HunterFitness.API.DTOs;
+using HunterFitness.API.Models;
 
 namespace HunterFitness.API.Functions
 {
@@ -12,18 +13,15 @@ namespace HunterFitness.API.Functions
     {
         private readonly IQuestService _questService;
         private readonly IAuthService _authService;
-        private readonly IAchievementService _achievementService;
         private readonly ILogger<QuestFunctions> _logger;
 
         public QuestFunctions(
             IQuestService questService,
             IAuthService authService,
-            IAchievementService achievementService,
             ILogger<QuestFunctions> logger)
         {
             _questService = questService;
             _authService = authService;
-            _achievementService = achievementService;
             _logger = logger;
         }
 
@@ -160,18 +158,6 @@ namespace HunterFitness.API.Functions
 
                 var result = await _questService.UpdateQuestProgressAsync(hunter.HunterID, updateDto);
 
-                // Si el quest se completó automáticamente, verificar achievements
-                if (result.Success && result.Quest?.IsCompleted == true)
-                {
-                    var newAchievements = await _achievementService.CheckAndUpdateAchievementsAsync(
-                        hunter.HunterID, "quest_completed");
-                    
-                    if (newAchievements.Any())
-                    {
-                        result.AchievementsUnlocked = newAchievements.Select(a => a.AchievementName).ToList();
-                    }
-                }
-
                 var statusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
                 var response = req.CreateResponse(statusCode);
                 
@@ -224,35 +210,6 @@ namespace HunterFitness.API.Functions
                 }
 
                 var result = await _questService.CompleteQuestAsync(hunter.HunterID, completeDto);
-
-                // Verificar achievements después de completar
-                if (result.Success)
-                {
-                    var eventTypes = new List<string> { "quest_completed", "workout_completed" };
-
-                    // Agregar evento específico del tipo de quest si está disponible
-                    if (result.Quest != null)
-                    {
-                        var questType = result.Quest.QuestType.ToLower();
-                        if (questType.Contains("strength"))
-                            eventTypes.Add("strength_exercise_completed");
-                        else if (questType.Contains("cardio") || questType.Contains("endurance"))
-                            eventTypes.Add("endurance_exercise_completed");
-                    }
-
-                    var allNewAchievements = new List<AchievementDto>();
-                    foreach (var eventType in eventTypes)
-                    {
-                        var newAchievements = await _achievementService.CheckAndUpdateAchievementsAsync(
-                            hunter.HunterID, eventType);
-                        allNewAchievements.AddRange(newAchievements);
-                    }
-
-                    if (allNewAchievements.Any())
-                    {
-                        result.AchievementsUnlocked = allNewAchievements.Select(a => a.AchievementName).Distinct().ToList();
-                    }
-                }
 
                 var statusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
                 var response = req.CreateResponse(statusCode);
@@ -445,7 +402,7 @@ namespace HunterFitness.API.Functions
         }
 
         // Helper methods
-        private async Task<Models.Hunter?> GetHunterFromToken(HttpRequestData req)
+        private async Task<Hunter?> GetHunterFromToken(HttpRequestData req)
         {
             try
             {

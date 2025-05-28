@@ -64,9 +64,9 @@ namespace HunterFitness.API.Models
         {
             var baseStats = Strength + Agility + Vitality + Endurance;
             var equipmentBonus = Equipment?
-                .Where(e => e.IsEquipped)
-                .Sum(e => e.Equipment?.StrengthBonus + e.Equipment?.AgilityBonus + 
-                         e.Equipment?.VitalityBonus + e.Equipment?.EnduranceBonus) ?? 0;
+                .Where(e => e.IsEquipped && e.Equipment != null)
+                .Sum(e => e.Equipment.StrengthBonus + e.Equipment.AgilityBonus + 
+                         e.Equipment.VitalityBonus + e.Equipment.EnduranceBonus) ?? 0;
             
             return baseStats + equipmentBonus;
         }
@@ -126,6 +126,48 @@ namespace HunterFitness.API.Models
                 >= 21 => "C",
                 >= 11 => "D",
                 _ => "E"
+            };
+        }
+
+        public void ProcessLevelUp()
+        {
+            while (CanLevelUp())
+            {
+                var xpRequired = GetXPRequiredForNextLevel();
+                CurrentXP -= xpRequired;
+                Level++;
+                
+                // Actualizar rank automáticamente
+                UpdateRankBasedOnLevel();
+            }
+        }
+
+        public decimal GetLevelProgressPercentage()
+        {
+            var xpRequired = GetXPRequiredForNextLevel();
+            return xpRequired > 0 ? (decimal)CurrentXP / xpRequired * 100 : 0;
+        }
+
+        public Dictionary<string, object> GetHunterSummary()
+        {
+            return new Dictionary<string, object>
+            {
+                {"HunterID", HunterID},
+                {"Username", Username},
+                {"HunterName", HunterName},
+                {"Level", Level},
+                {"Rank", HunterRank},
+                {"RankDisplay", GetRankDisplayName()},
+                {"TotalXP", TotalXP},
+                {"CurrentXP", CurrentXP},
+                {"XPForNextLevel", GetXPRequiredForNextLevel()},
+                {"TotalStats", Strength + Agility + Vitality + Endurance},
+                {"TotalStatsWithEquipment", GetTotalStatsWithEquipment()},
+                {"DailyStreak", DailyStreak},
+                {"LongestStreak", LongestStreak},
+                {"TotalWorkouts", TotalWorkouts},
+                {"JoinedDaysAgo", (DateTime.UtcNow - CreatedAt).Days},
+                {"EquippedItemsCount", Equipment?.Count(e => e.IsEquipped) ?? 0}
             };
         }
     }

@@ -16,29 +16,27 @@ var host = new HostBuilder()
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
         
-        // Entity Framework
-        var connectionString = Environment.GetEnvironmentVariable("HunterFitnessDB");
-        if (!string.IsNullOrEmpty(connectionString))
+        // Entity Framework - Usando la cadena de conexión que proporcionaste
+        var connectionString = "Server=tcp:hunter-fitness-server.database.windows.net,1433;Initial Catalog=HunterFitnessDB;Persist Security Info=False;User ID=hunterfitness_admin;Password=HunterFit2025!;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
+        
+        services.AddDbContext<HunterFitnessDbContext>(options =>
         {
-            services.AddDbContext<HunterFitnessDbContext>(options =>
+            options.UseSqlServer(connectionString, sqlOptions =>
             {
-                options.UseSqlServer(connectionString, sqlOptions =>
-                {
-                    sqlOptions.EnableRetryOnFailure(
-                        maxRetryCount: 3,
-                        maxRetryDelay: TimeSpan.FromSeconds(5),
-                        errorNumbersToAdd: null);
-                    sqlOptions.CommandTimeout(30);
-                });
-                
-                // Solo en desarrollo
-                if (Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT") == "Development")
-                {
-                    options.EnableSensitiveDataLogging();
-                    options.EnableDetailedErrors();
-                }
+                sqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 3,
+                    maxRetryDelay: TimeSpan.FromSeconds(5),
+                    errorNumbersToAdd: null);
+                sqlOptions.CommandTimeout(30);
             });
-        }
+            
+            // Solo en desarrollo
+            if (Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT") == "Development")
+            {
+                options.EnableSensitiveDataLogging();
+                options.EnableDetailedErrors();
+            }
+        });
         
         // CORS para desarrollo
         services.AddCors(options =>
@@ -51,10 +49,13 @@ var host = new HostBuilder()
             });
         });
         
-        // Servicios personalizados
+        // Servicios personalizados - ORDEN CORRECTO para evitar dependencias circulares
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IHunterService, HunterService>();
-        // services.AddScoped<IQuestService, QuestService>(); // Lo agregaremos después
+        services.AddScoped<IAchievementService, AchievementService>();
+        services.AddScoped<IQuestService, QuestService>();
+        services.AddScoped<IDungeonService, DungeonService>();
+        services.AddScoped<IEquipmentService, EquipmentService>();
     })
     .ConfigureLogging(logging =>
     {
