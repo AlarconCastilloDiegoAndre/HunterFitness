@@ -5,6 +5,7 @@ using System.Net;
 using System.Text.Json;
 using HunterFitness.API.Services;
 using HunterFitness.API.DTOs;
+using HunterFitness.API.Models;
 
 namespace HunterFitness.API.Functions
 {
@@ -281,7 +282,7 @@ namespace HunterFitness.API.Functions
         }
 
         // Helper methods
-        private async Task<Models.Hunter?> GetHunterFromToken(HttpRequestData req)
+        private async Task<Hunter?> GetHunterFromToken(HttpRequestData req)
         {
             try
             {
