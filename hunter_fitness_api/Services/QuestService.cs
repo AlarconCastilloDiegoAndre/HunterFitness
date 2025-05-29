@@ -275,7 +275,7 @@ namespace HunterFitness.API.Services
                 hunter.TotalXP += hunterQuest.XPEarned;
                 hunter.TotalWorkouts++;
 
-                // Actualizar streak (simplificado)
+                // Actualizar streak
                 hunter.DailyStreak++;
                 if (hunter.DailyStreak > hunter.LongestStreak)
                 {
@@ -506,14 +506,13 @@ namespace HunterFitness.API.Services
         }
 
         // Helper methods
-        private List<DailyQuest> SelectVariedQuests(List<DailyQuest> availableQuests, int count, Hunter hunter)
+        private static List<DailyQuest> SelectVariedQuests(List<DailyQuest> availableQuests, int count, Hunter hunter)
         {
             var selected = new List<DailyQuest>();
             var random = new Random();
 
             // Intentar seleccionar quests de diferentes tipos
             var questTypes = new[] { "Cardio", "Strength", "Flexibility", "Endurance", "Mixed" };
-            var usedTypes = new HashSet<string>();
 
             foreach (var type in questTypes.OrderBy(t => random.Next()))
             {
@@ -527,7 +526,6 @@ namespace HunterFitness.API.Services
                 {
                     var selectedQuest = typeQuests[random.Next(typeQuests.Count)];
                     selected.Add(selectedQuest);
-                    usedTypes.Add(type);
                 }
             }
 
@@ -593,7 +591,7 @@ namespace HunterFitness.API.Services
             };
         }
 
-        private string GetTargetDescription(DailyQuest quest)
+        private static string GetTargetDescription(DailyQuest quest)
         {
             var targets = new List<string>();
 
@@ -618,7 +616,7 @@ namespace HunterFitness.API.Services
             return targets.Any() ? string.Join(", ", targets) : "Complete exercise";
         }
 
-        private string GetProgressMessage(List<HunterDailyQuestDto> quests)
+        private static string GetProgressMessage(List<HunterDailyQuestDto> quests)
         {
             if (!quests.Any()) return "No quests assigned today.";
 
@@ -634,7 +632,7 @@ namespace HunterFitness.API.Services
             };
         }
 
-        private string GetMotivationalMessage(List<HunterDailyQuestDto> quests)
+        private static string GetMotivationalMessage(List<HunterDailyQuestDto> quests)
         {
             var random = new Random();
             var messages = new[]
@@ -649,7 +647,7 @@ namespace HunterFitness.API.Services
             return messages[random.Next(messages.Length)];
         }
 
-        private string GetRelativeTime(DateTime dateTime)
+        private static string GetRelativeTime(DateTime dateTime)
         {
             var timeSince = DateTime.UtcNow - dateTime;
 

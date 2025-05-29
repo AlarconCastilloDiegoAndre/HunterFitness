@@ -358,64 +358,33 @@ namespace HunterFitness.API.Services
         // Helper methods
         private async Task<List<Achievement>> GetRelevantAchievements(string eventType)
         {
-            var achievements = new List<Achievement>();
-
-            switch (eventType.ToLower())
+            return eventType.ToLower() switch
             {
-                case "quest_completed":
-                case "workout_completed":
-                    achievements = await _context.Achievements
-                        .Where(a => a.IsActive && 
-                                  (a.Category == "Consistency" || a.Category == "Milestone"))
-                        .ToListAsync();
-                    break;
-
-                case "strength_exercise_completed":
-                    achievements = await _context.Achievements
-                        .Where(a => a.IsActive && a.Category == "Strength")
-                        .ToListAsync();
-                    break;
-
-                case "cardio_exercise_completed":
-                case "endurance_exercise_completed":
-                    achievements = await _context.Achievements
-                        .Where(a => a.IsActive && a.Category == "Endurance")
-                        .ToListAsync();
-                    break;
-
-                case "dungeon_completed":
-                    achievements = await _context.Achievements
-                        .Where(a => a.IsActive && 
-                                  (a.Category == "Milestone" || a.Category == "Special"))
-                        .ToListAsync();
-                    break;
-
-                case "level_up":
-                    achievements = await _context.Achievements
-                        .Where(a => a.IsActive && a.Category == "Milestone")
-                        .ToListAsync();
-                    break;
-
-                case "streak_milestone":
-                    achievements = await _context.Achievements
-                        .Where(a => a.IsActive && 
-                                  a.Category == "Consistency" && 
-                                  a.AchievementType == "Streak")
-                        .ToListAsync();
-                    break;
-
-                default:
-                    // Para eventos no específicos, obtener achievements generales
-                    achievements = await _context.Achievements
-                        .Where(a => a.IsActive && a.Category == "Milestone")
-                        .ToListAsync();
-                    break;
-            }
-
-            return achievements;
+                "quest_completed" or "workout_completed" => await _context.Achievements
+                    .Where(a => a.IsActive && (a.Category == "Consistency" || a.Category == "Milestone"))
+                    .ToListAsync(),
+                "strength_exercise_completed" => await _context.Achievements
+                    .Where(a => a.IsActive && a.Category == "Strength")
+                    .ToListAsync(),
+                "cardio_exercise_completed" or "endurance_exercise_completed" => await _context.Achievements
+                    .Where(a => a.IsActive && a.Category == "Endurance")
+                    .ToListAsync(),
+                "dungeon_completed" => await _context.Achievements
+                    .Where(a => a.IsActive && (a.Category == "Milestone" || a.Category == "Special"))
+                    .ToListAsync(),
+                "level_up" => await _context.Achievements
+                    .Where(a => a.IsActive && a.Category == "Milestone")
+                    .ToListAsync(),
+                "streak_milestone" => await _context.Achievements
+                    .Where(a => a.IsActive && a.Category == "Consistency" && a.AchievementType == "Streak")
+                    .ToListAsync(),
+                _ => await _context.Achievements
+                    .Where(a => a.IsActive && a.Category == "Milestone")
+                    .ToListAsync()
+            };
         }
 
-        private AchievementDto ConvertToAchievementDto(Achievement achievement, HunterAchievement? hunterAchievement, Hunter hunter)
+        private static AchievementDto ConvertToAchievementDto(Achievement achievement, HunterAchievement? hunterAchievement, Hunter hunter)
         {
             var currentProgress = hunterAchievement?.CurrentProgress ?? 0;
             var isUnlocked = hunterAchievement?.IsUnlocked ?? false;
@@ -458,7 +427,7 @@ namespace HunterFitness.API.Services
             };
         }
 
-        private string GetCategoryIcon(string category)
+        private static string GetCategoryIcon(string category)
         {
             return category switch
             {
@@ -472,7 +441,7 @@ namespace HunterFitness.API.Services
             };
         }
 
-        private decimal CalculateAverageProgress(List<AchievementDto> inProgressAchievements)
+        private static decimal CalculateAverageProgress(List<AchievementDto> inProgressAchievements)
         {
             if (!inProgressAchievements.Any()) return 0;
             

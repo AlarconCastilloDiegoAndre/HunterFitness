@@ -314,12 +314,21 @@ namespace HunterFitness.API.Services
 
         private async Task<HunterProfileDto> ConvertToHunterProfileDto(Hunter hunter)
         {
+            // Recargar hunter con equipment si no está incluido
+            if (hunter.Equipment == null || !hunter.Equipment.Any())
+            {
+                hunter = await _context.Hunters
+                    .Include(h => h.Equipment.Where(e => e.IsEquipped))
+                        .ThenInclude(e => e.Equipment)
+                    .FirstOrDefaultAsync(h => h.HunterID == hunter.HunterID) ?? hunter;
+            }
+
             // Obtener equipment equipado
             var equippedItems = hunter.Equipment?
                 .Where(e => e.IsEquipped && e.Equipment != null)
                 .Select(e => new EquippedItemDto
                 {
-                    EquipmentID = e.Equipment.EquipmentID,
+                    EquipmentID = e.Equipment!.EquipmentID,
                     ItemName = e.Equipment.ItemName,
                     ItemType = e.Equipment.ItemType,
                     Rarity = e.Equipment.Rarity,
@@ -333,6 +342,9 @@ namespace HunterFitness.API.Services
                     IconUrl = e.Equipment.IconUrl,
                     PowerLevel = e.Equipment.GetPowerLevel()
                 }).ToList() ?? new List<EquippedItemDto>();
+
+            var xpForNextLevel = hunter.GetXPRequiredForNextLevel();
+            var levelProgressPercentage = xpForNextLevel > 0 ? (decimal)hunter.CurrentXP / xpForNextLevel * 100 : 0;
 
             return new HunterProfileDto
             {
@@ -353,8 +365,8 @@ namespace HunterFitness.API.Services
                 DailyStreak = hunter.DailyStreak,
                 LongestStreak = hunter.LongestStreak,
                 TotalWorkouts = hunter.TotalWorkouts,
-                XPRequiredForNextLevel = hunter.GetXPRequiredForNextLevel(),
-                LevelProgressPercentage = hunter.CurrentXP * 100m / hunter.GetXPRequiredForNextLevel(),
+                XPRequiredForNextLevel = xpForNextLevel,
+                LevelProgressPercentage = levelProgressPercentage,
                 CanLevelUp = hunter.CanLevelUp(),
                 NextRankRequirement = hunter.GetNextRankRequirement(),
                 CreatedAt = hunter.CreatedAt,
@@ -363,7 +375,7 @@ namespace HunterFitness.API.Services
                 EquippedItems = equippedItems,
                 AdditionalStats = new Dictionary<string, object>
                 {
-                    {"JoinedDaysAgo", (DateTime.UtcNow - hunter.CreatedAt).Days},
+                    {"JoinedDaysAgo", Math.Max(1, (DateTime.UtcNow - hunter.CreatedAt).Days)},
                     {"AverageXPPerDay", hunter.TotalXP / Math.Max(1, (DateTime.UtcNow - hunter.CreatedAt).Days)},
                     {"EquippedItemsCount", equippedItems.Count},
                     {"TotalPowerLevel", equippedItems.Sum(e => e.PowerLevel)}

@@ -306,14 +306,17 @@ namespace HunterFitness.API.Services
                     .Where(q => q.HunterID == hunterId && q.CompletedAt.Date == DateTime.UtcNow.Date)
                     .CountAsync();
 
+                var xpForNextLevel = hunter.GetXPRequiredForNextLevel();
+                var levelProgressPercentage = xpForNextLevel > 0 ? (decimal)hunter.CurrentXP / xpForNextLevel * 100 : 0;
+
                 return new HunterProgressDto
                 {
                     HunterID = hunter.HunterID,
                     HunterName = hunter.HunterName,
                     CurrentLevel = hunter.Level,
                     CurrentXP = hunter.CurrentXP,
-                    XPRequiredForNextLevel = hunter.GetXPRequiredForNextLevel(),
-                    LevelProgressPercentage = (decimal)hunter.CurrentXP / hunter.GetXPRequiredForNextLevel() * 100,
+                    XPRequiredForNextLevel = xpForNextLevel,
+                    LevelProgressPercentage = levelProgressPercentage,
                     CurrentRank = hunter.HunterRank,
                     NextRank = GetNextRank(hunter.HunterRank),
                     LevelRequiredForNextRank = GetLevelRequiredForNextRank(hunter.HunterRank),
@@ -471,6 +474,15 @@ namespace HunterFitness.API.Services
 
         private async Task<HunterProfileDto> ConvertToHunterProfileDto(Hunter hunter)
         {
+            // Asegurar que equipment esté cargado
+            if (hunter.Equipment == null || !hunter.Equipment.Any())
+            {
+                hunter = await _context.Hunters
+                    .Include(h => h.Equipment.Where(e => e.IsEquipped))
+                        .ThenInclude(e => e.Equipment)
+                    .FirstOrDefaultAsync(h => h.HunterID == hunter.HunterID) ?? hunter;
+            }
+
             // Obtener equipment equipado
             var equippedItems = hunter.Equipment?
                 .Where(e => e.IsEquipped && e.Equipment != null)
@@ -491,6 +503,10 @@ namespace HunterFitness.API.Services
                     PowerLevel = e.Equipment.GetPowerLevel()
                 }).ToList() ?? new List<EquippedItemDto>();
 
+            var xpForNextLevel = hunter.GetXPRequiredForNextLevel();
+            var levelProgressPercentage = xpForNextLevel > 0 ? (decimal)hunter.CurrentXP / xpForNextLevel * 100 : 0;
+            var daysSinceJoining = Math.Max(1, (DateTime.UtcNow - hunter.CreatedAt).Days);
+
             return new HunterProfileDto
             {
                 HunterID = hunter.HunterID,
@@ -510,8 +526,8 @@ namespace HunterFitness.API.Services
                 DailyStreak = hunter.DailyStreak,
                 LongestStreak = hunter.LongestStreak,
                 TotalWorkouts = hunter.TotalWorkouts,
-                XPRequiredForNextLevel = hunter.GetXPRequiredForNextLevel(),
-                LevelProgressPercentage = hunter.CurrentXP * 100m / hunter.GetXPRequiredForNextLevel(),
+                XPRequiredForNextLevel = xpForNextLevel,
+                LevelProgressPercentage = levelProgressPercentage,
                 CanLevelUp = hunter.CanLevelUp(),
                 NextRankRequirement = hunter.GetNextRankRequirement(),
                 CreatedAt = hunter.CreatedAt,
@@ -520,15 +536,15 @@ namespace HunterFitness.API.Services
                 EquippedItems = equippedItems,
                 AdditionalStats = new Dictionary<string, object>
                 {
-                    {"JoinedDaysAgo", (DateTime.UtcNow - hunter.CreatedAt).Days},
-                    {"AverageXPPerDay", hunter.TotalXP / Math.Max(1, (DateTime.UtcNow - hunter.CreatedAt).Days)},
+                    {"JoinedDaysAgo", daysSinceJoining},
+                    {"AverageXPPerDay", hunter.TotalXP / daysSinceJoining},
                     {"EquippedItemsCount", equippedItems.Count},
                     {"TotalPowerLevel", equippedItems.Sum(e => e.PowerLevel)}
                 }
             };
         }
 
-        private string GetNextRank(string currentRank)
+        private static string GetNextRank(string currentRank)
         {
             return currentRank switch
             {
@@ -544,7 +560,7 @@ namespace HunterFitness.API.Services
             };
         }
 
-        private int GetLevelRequiredForNextRank(string currentRank)
+        private static int GetLevelRequiredForNextRank(string currentRank)
         {
             return currentRank switch
             {
