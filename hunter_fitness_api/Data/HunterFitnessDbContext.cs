@@ -11,17 +11,17 @@ namespace HunterFitness.API.Data
         }
 
         // DbSets - Tablas principales
-        public DbSet<Hunter> Hunters { get; set; }
-        public DbSet<DailyQuest> DailyQuests { get; set; }
-        public DbSet<HunterDailyQuest> HunterDailyQuests { get; set; }
-        public DbSet<Dungeon> Dungeons { get; set; }
-        public DbSet<DungeonExercise> DungeonExercises { get; set; }
-        public DbSet<DungeonRaid> DungeonRaids { get; set; }
-        public DbSet<Achievement> Achievements { get; set; }
-        public DbSet<HunterAchievement> HunterAchievements { get; set; }
-        public DbSet<Equipment> Equipment { get; set; }
-        public DbSet<HunterEquipment> HunterEquipment { get; set; }
-        public DbSet<QuestHistory> QuestHistory { get; set; }
+        public DbSet<Hunter> Hunters { get; set; } = null!;
+        public DbSet<DailyQuest> DailyQuests { get; set; } = null!;
+        public DbSet<HunterDailyQuest> HunterDailyQuests { get; set; } = null!;
+        public DbSet<Dungeon> Dungeons { get; set; } = null!;
+        public DbSet<DungeonExercise> DungeonExercises { get; set; } = null!;
+        public DbSet<DungeonRaid> DungeonRaids { get; set; } = null!;
+        public DbSet<Achievement> Achievements { get; set; } = null!;
+        public DbSet<HunterAchievement> HunterAchievements { get; set; } = null!;
+        public DbSet<Equipment> Equipment { get; set; } = null!;
+        public DbSet<HunterEquipment> HunterEquipment { get; set; } = null!;
+        public DbSet<QuestHistory> QuestHistory { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -70,6 +70,10 @@ namespace HunterFitness.API.Data
                 
                 entity.HasCheckConstraint("CK_DailyQuest_Difficulty",
                     "Difficulty IN ('Easy', 'Medium', 'Hard', 'Extreme')");
+
+                // Configurar columna decimal para TargetDistance
+                entity.Property(e => e.TargetDistance)
+                    .HasColumnType("decimal(10,2)");
             });
 
             // Configuración de HunterDailyQuest
@@ -91,6 +95,16 @@ namespace HunterFitness.API.Data
                 
                 entity.HasCheckConstraint("CK_HunterDailyQuest_Progress",
                     "Progress >= 0 AND Progress <= 100");
+
+                // Configurar columnas decimales
+                entity.Property(e => e.Progress)
+                    .HasColumnType("decimal(5,2)");
+
+                entity.Property(e => e.BonusMultiplier)
+                    .HasColumnType("decimal(3,2)");
+
+                entity.Property(e => e.CurrentDistance)
+                    .HasColumnType("decimal(10,2)");
 
                 // Relaciones
                 entity.HasOne(d => d.Hunter)
@@ -154,6 +168,13 @@ namespace HunterFitness.API.Data
                 
                 entity.HasCheckConstraint("CK_DungeonRaid_Progress",
                     "Progress >= 0 AND Progress <= 100");
+
+                // Configurar columnas decimales
+                entity.Property(e => e.Progress)
+                    .HasColumnType("decimal(5,2)");
+
+                entity.Property(e => e.CompletionRate)
+                    .HasColumnType("decimal(5,2)");
 
                 // Relaciones
                 entity.HasOne(d => d.Hunter)
@@ -226,6 +247,10 @@ namespace HunterFitness.API.Data
                 
                 entity.HasCheckConstraint("CK_Equipment_XPMultiplier",
                     "XPMultiplier >= 0.5 AND XPMultiplier <= 3.0");
+
+                // Configurar columna decimal para XPMultiplier
+                entity.Property(e => e.XPMultiplier)
+                    .HasColumnType("decimal(3,2)");
             });
 
             // Configuración de HunterEquipment
@@ -266,6 +291,13 @@ namespace HunterFitness.API.Data
                 entity.HasCheckConstraint("CK_QuestHistory_BonusMultiplier",
                     "BonusMultiplier >= 0.5 AND BonusMultiplier <= 5.0");
 
+                // Configurar columnas decimales
+                entity.Property(e => e.BonusMultiplier)
+                    .HasColumnType("decimal(3,2)");
+
+                entity.Property(e => e.FinalDistance)
+                    .HasColumnType("decimal(10,2)");
+
                 // Relaciones
                 entity.HasOne(d => d.Hunter)
                     .WithMany(p => p.QuestHistory)
@@ -277,43 +309,6 @@ namespace HunterFitness.API.Data
                     .HasForeignKey(d => d.QuestID)
                     .OnDelete(DeleteBehavior.Cascade);
             });
-
-            // Configurar tipos de columna específicos para decimales
-            modelBuilder.Entity<HunterDailyQuest>()
-                .Property(e => e.Progress)
-                .HasColumnType("decimal(5,2)");
-
-            modelBuilder.Entity<HunterDailyQuest>()
-                .Property(e => e.BonusMultiplier)
-                .HasColumnType("decimal(3,2)");
-
-            modelBuilder.Entity<HunterDailyQuest>()
-                .Property(e => e.CurrentDistance)
-                .HasColumnType("decimal(10,2)");
-
-            modelBuilder.Entity<DungeonRaid>()
-                .Property(e => e.Progress)
-                .HasColumnType("decimal(5,2)");
-
-            modelBuilder.Entity<DungeonRaid>()
-                .Property(e => e.CompletionRate)
-                .HasColumnType("decimal(5,2)");
-
-            modelBuilder.Entity<Equipment>()
-                .Property(e => e.XPMultiplier)
-                .HasColumnType("decimal(3,2)");
-
-            modelBuilder.Entity<QuestHistory>()
-                .Property(e => e.BonusMultiplier)
-                .HasColumnType("decimal(3,2)");
-
-            modelBuilder.Entity<QuestHistory>()
-                .Property(e => e.FinalDistance)
-                .HasColumnType("decimal(10,2)");
-
-            modelBuilder.Entity<DailyQuest>()
-                .Property(e => e.TargetDistance)
-                .HasColumnType("decimal(10,2)");
         }
 
         // Método helper para obtener la cadena de conexión
@@ -369,6 +364,91 @@ namespace HunterFitness.API.Data
                 .ThenByDescending(h => h.LongestStreak)
                 .Take(limit)
                 .ToListAsync();
+        }
+
+        // Métodos adicionales para facilitar consultas comunes
+        public async Task<bool> UsernameExistsAsync(string username)
+        {
+            return await Hunters.AnyAsync(h => h.Username == username && h.IsActive);
+        }
+
+        public async Task<bool> EmailExistsAsync(string email)
+        {
+            return await Hunters.AnyAsync(h => h.Email == email && h.IsActive);
+        }
+
+        public async Task<int> GetActiveHuntersCountAsync()
+        {
+            return await Hunters.CountAsync(h => h.IsActive);
+        }
+
+        public async Task<List<Achievement>> GetAchievementsByCategoryAsync(string category)
+        {
+            return await Achievements
+                .Where(a => a.Category == category && a.IsActive)
+                .OrderBy(a => a.AchievementName)
+                .ToListAsync();
+        }
+
+        public async Task<List<Equipment>> GetEquipmentByTypeAsync(string itemType)
+        {
+            return await Equipment
+                .Where(e => e.ItemType == itemType && e.IsActive)
+                .OrderBy(e => e.UnlockLevel)
+                .ThenBy(e => e.ItemName)
+                .ToListAsync();
+        }
+
+        public async Task<List<DailyQuest>> GetQuestsByDifficultyAsync(string difficulty)
+        {
+            return await DailyQuests
+                .Where(q => q.Difficulty == difficulty && q.IsActive)
+                .OrderBy(q => q.MinLevel)
+                .ThenBy(q => q.QuestName)
+                .ToListAsync();
+        }
+
+        // Método para verificar la salud de la base de datos
+        public async Task<bool> CheckHealthAsync()
+        {
+            try
+            {
+                return await Database.CanConnectAsync();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // Método para aplicar migraciones pendientes
+        public async Task<bool> ApplyPendingMigrationsAsync()
+        {
+            try
+            {
+                var pendingMigrations = await Database.GetPendingMigrationsAsync();
+                if (pendingMigrations.Any())
+                {
+                    await Database.MigrateAsync();
+                    return true;
+                }
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // Override del Dispose para limpieza
+        public override void Dispose()
+        {
+            base.Dispose();
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            await base.DisposeAsync();
         }
     }
 }

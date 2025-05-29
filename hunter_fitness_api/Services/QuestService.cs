@@ -269,18 +269,11 @@ namespace HunterFitness.API.Services
 
                 _context.QuestHistory.Add(questHistory);
 
-                // Agregar XP al hunter
-                var hunter = hunterQuest.Hunter;
-                hunter.CurrentXP += hunterQuest.XPEarned;
-                hunter.TotalXP += hunterQuest.XPEarned;
-                hunter.TotalWorkouts++;
+                // Agregar XP al hunter usando método interno
+                await AddXPToHunterAsync(hunterId, hunterQuest.XPEarned, $"Quest: {hunterQuest.Quest.QuestName}");
 
-                // Actualizar streak
-                hunter.DailyStreak++;
-                if (hunter.DailyStreak > hunter.LongestStreak)
-                {
-                    hunter.LongestStreak = hunter.DailyStreak;
-                }
+                // Actualizar workout count y streak
+                await UpdateHunterStatsAsync(hunterId);
 
                 await _context.SaveChangesAsync();
 
@@ -355,6 +348,12 @@ namespace HunterFitness.API.Services
         {
             try
             {
+                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
+                if (hunter == null)
+                {
+                    throw new ArgumentException("Hunter not found");
+                }
+
                 var totalCompleted = await _context.QuestHistory
                     .Where(qh => qh.HunterID == hunterId)
                     .CountAsync();
@@ -377,24 +376,43 @@ namespace HunterFitness.API.Services
                     .Where(qh => qh.HunterID == hunterId && qh.CompletedAt >= startOfMonth)
                     .CountAsync();
 
+                // Obtener estadísticas por tipo
+                var questsByType = await _context.QuestHistory
+                    .Include(qh => qh.Quest)
+                    .Where(qh => qh.HunterID == hunterId)
+                    .GroupBy(qh => qh.Quest.QuestType)
+                    .ToDictionaryAsync(g => g.Key, g => g.Count());
+
+                var xpByType = await _context.QuestHistory
+                    .Include(qh => qh.Quest)
+                    .Where(qh => qh.HunterID == hunterId)
+                    .GroupBy(qh => qh.Quest.QuestType)
+                    .ToDictionaryAsync(g => g.Key, g => g.Sum(q => q.XPEarned));
+
+                var questsByDifficulty = await _context.QuestHistory
+                    .Include(qh => qh.Quest)
+                    .Where(qh => qh.HunterID == hunterId)
+                    .GroupBy(qh => qh.Quest.Difficulty)
+                    .ToDictionaryAsync(g => g.Key, g => g.Count());
+
                 return new QuestStatsDto
                 {
                     HunterID = hunterId,
                     TotalQuestsCompleted = totalCompleted,
                     TotalXPFromQuests = totalXP,
-                    CurrentStreak = 0, // TODO: Implementar cálculo de streak
-                    LongestStreak = 0, // TODO: Implementar cálculo de streak
+                    CurrentStreak = hunter.DailyStreak,
+                    LongestStreak = hunter.LongestStreak,
                     QuestsCompletedToday = todayCount,
                     QuestsCompletedThisWeek = weeklyCount,
                     QuestsCompletedThisMonth = monthlyCount,
-                    QuestsByType = new Dictionary<string, int>(),
-                    XPByType = new Dictionary<string, int>(),
-                    AverageTimeByType = new Dictionary<string, double>(),
-                    QuestsByDifficulty = new Dictionary<string, int>(),
-                    AveragePerformanceByDifficulty = new Dictionary<string, decimal>(),
-                    PersonalBests = new List<PersonalBestDto>(),
-                    WeeklyTrends = new List<QuestTrendDto>(),
-                    ProgressTrend = 0.0
+                    QuestsByType = questsByType,
+                    XPByType = xpByType,
+                    AverageTimeByType = new Dictionary<string, double>(), // TODO: Implementar cálculo
+                    QuestsByDifficulty = questsByDifficulty,
+                    AveragePerformanceByDifficulty = new Dictionary<string, decimal>(), // TODO: Implementar cálculo
+                    PersonalBests = new List<PersonalBestDto>(), // TODO: Implementar personal bests
+                    WeeklyTrends = new List<QuestTrendDto>(), // TODO: Implementar tendencias
+                    ProgressTrend = 0.0 // TODO: Implementar tendencia de progreso
                 };
             }
             catch (Exception ex)
@@ -505,7 +523,58 @@ namespace HunterFitness.API.Services
             }
         }
 
-        // Helper methods
+        // Helper methods - internos para evitar dependencias circulares
+        private async Task<bool> AddXPToHunterAsync(Guid hunterId, int xpAmount, string source)
+        {
+            try
+            {
+                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
+                if (hunter == null) return false;
+
+                hunter.CurrentXP += xpAmount;
+                hunter.TotalXP += xpAmount;
+
+                // Usar el método del modelo para level up
+                hunter.ProcessLevelUp();
+
+                _logger.LogInformation("⭐ XP Added: {XP} to Hunter {HunterID} from {Source}", xpAmount, hunterId, source);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "💀 Error adding XP: {HunterID}", hunterId);
+                return false;
+            }
+        }
+
+        private async Task<bool> UpdateHunterStatsAsync(Guid hunterId)
+        {
+            try
+            {
+                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
+                if (hunter == null) return false;
+
+                hunter.TotalWorkouts++;
+                hunter.DailyStreak++;
+
+                if (hunter.DailyStreak > hunter.LongestStreak)
+                {
+                    hunter.LongestStreak = hunter.DailyStreak;
+                }
+
+                _logger.LogInformation("💪 Hunter stats updated: {HunterID} - Workouts: {Count}, Streak: {Streak}", 
+                    hunterId, hunter.TotalWorkouts, hunter.DailyStreak);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "💀 Error updating hunter stats: {HunterID}", hunterId);
+                return false;
+            }
+        }
+
         private static List<DailyQuest> SelectVariedQuests(List<DailyQuest> availableQuests, int count, Hunter hunter)
         {
             var selected = new List<DailyQuest>();
@@ -547,6 +616,11 @@ namespace HunterFitness.API.Services
 
         private HunterDailyQuestDto ConvertToHunterDailyQuestDto(HunterDailyQuest hunterQuest)
         {
+            if (hunterQuest.Quest == null)
+            {
+                throw new InvalidOperationException("Quest data is missing from HunterDailyQuest");
+            }
+
             return new HunterDailyQuestDto
             {
                 AssignmentID = hunterQuest.AssignmentID,

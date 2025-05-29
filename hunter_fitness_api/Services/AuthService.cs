@@ -315,12 +315,17 @@ namespace HunterFitness.API.Services
         private async Task<HunterProfileDto> ConvertToHunterProfileDto(Hunter hunter)
         {
             // Recargar hunter con equipment si no está incluido
-            if (hunter.Equipment == null || !hunter.Equipment.Any())
+            if (hunter.Equipment?.Any() != true)
             {
-                hunter = await _context.Hunters
+                var hunterWithEquipment = await _context.Hunters
                     .Include(h => h.Equipment.Where(e => e.IsEquipped))
                         .ThenInclude(e => e.Equipment)
-                    .FirstOrDefaultAsync(h => h.HunterID == hunter.HunterID) ?? hunter;
+                    .FirstOrDefaultAsync(h => h.HunterID == hunter.HunterID);
+
+                if (hunterWithEquipment != null)
+                {
+                    hunter = hunterWithEquipment;
+                }
             }
 
             // Obtener equipment equipado

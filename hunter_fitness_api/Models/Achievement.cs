@@ -15,12 +15,14 @@ namespace HunterFitness.API.Models
         [StringLength(500)]
         public string Description { get; set; } = string.Empty;
 
+        [Required]
         [StringLength(30)]
         public string Category { get; set; } = "Milestone"; // Consistency, Strength, Endurance, Social, Special, Milestone
 
         // Configuración del logro
         public int? TargetValue { get; set; } // Valor objetivo (ej: 100 workouts)
 
+        [Required]
         [StringLength(20)]
         public string AchievementType { get; set; } = "Counter"; // Counter, Streak, Single, Progressive
 
@@ -120,7 +122,7 @@ namespace HunterFitness.API.Models
             return IsActive && hunter.IsActive;
         }
 
-        public int GetEstimatedDaysToComplete(Hunter hunter)
+        public int GetEstimatedDaysToComplete(Hunter? hunter)
         {
             if (!TargetValue.HasValue) return 0;
 
@@ -192,8 +194,192 @@ namespace HunterFitness.API.Models
                 {"TitleReward", TitleReward ?? "None"},
                 {"TargetValue", TargetValue ?? 0},
                 {"IsHidden", IsHidden},
-                {"EstimatedDays", GetEstimatedDaysToComplete(null!)}
+                {"EstimatedDays", GetEstimatedDaysToComplete(null)}
             };
+        }
+
+        // Métodos adicionales para análisis
+        public bool IsConsistencyAchievement()
+        {
+            return Category == "Consistency";
+        }
+
+        public bool IsStrengthAchievement()
+        {
+            return Category == "Strength";
+        }
+
+        public bool IsEnduranceAchievement()
+        {
+            return Category == "Endurance";
+        }
+
+        public bool IsSocialAchievement()
+        {
+            return Category == "Social";
+        }
+
+        public bool IsSpecialAchievement()
+        {
+            return Category == "Special";
+        }
+
+        public bool IsMilestoneAchievement()
+        {
+            return Category == "Milestone";
+        }
+
+        public bool IsCounterType()
+        {
+            return AchievementType == "Counter";
+        }
+
+        public bool IsStreakType()
+        {
+            return AchievementType == "Streak";
+        }
+
+        public bool IsSingleType()
+        {
+            return AchievementType == "Single";
+        }
+
+        public bool IsProgressiveType()
+        {
+            return AchievementType == "Progressive";
+        }
+
+        public bool HasTitleReward()
+        {
+            return !string.IsNullOrWhiteSpace(TitleReward);
+        }
+
+        public bool IsHighValue()
+        {
+            return XPReward >= 1000 || GetDifficultyLevel() is "Master" or "Legendary";
+        }
+
+        public bool IsEasyToComplete()
+        {
+            return GetDifficultyLevel() is "Novice" or "Apprentice";
+        }
+
+        public bool IsChallengingToComplete()
+        {
+            return GetDifficultyLevel() is "Expert" or "Master" or "Legendary";
+        }
+
+        public string GetCategoryIcon()
+        {
+            return Category switch
+            {
+                "Consistency" => "🔥",
+                "Strength" => "💪",
+                "Endurance" => "🏃‍♂️",
+                "Social" => "👥",
+                "Special" => "⭐",
+                "Milestone" => "🎯",
+                _ => "🏆"
+            };
+        }
+
+        public string GetDifficultyStars()
+        {
+            return GetDifficultyLevel() switch
+            {
+                "Novice" => "⭐",
+                "Apprentice" => "⭐⭐",
+                "Adept" => "⭐⭐⭐",
+                "Expert" => "⭐⭐⭐⭐",
+                "Master" => "⭐⭐⭐⭐⭐",
+                "Legendary" => "⭐⭐⭐⭐⭐⭐",
+                _ => "✨"
+            };
+        }
+
+        public int GetDifficultyValue()
+        {
+            return GetDifficultyLevel() switch
+            {
+                "Novice" => 1,
+                "Apprentice" => 2,
+                "Adept" => 3,
+                "Expert" => 4,
+                "Master" => 5,
+                "Legendary" => 6,
+                _ => 0
+            };
+        }
+
+        public string GetShortDescription()
+        {
+            if (Description.Length <= 50)
+                return Description;
+            
+            return Description.Substring(0, 47) + "...";
+        }
+
+        public bool IsRecentlyCreated(int days = 30)
+        {
+            return DateTime.UtcNow - CreatedAt <= TimeSpan.FromDays(days);
+        }
+
+        // Validaciones
+        public List<string> ValidateData()
+        {
+            var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(AchievementName))
+                errors.Add("Achievement name is required");
+
+            if (string.IsNullOrWhiteSpace(Description))
+                errors.Add("Description is required");
+
+            var validCategories = new[] { "Consistency", "Strength", "Endurance", "Social", "Special", "Milestone" };
+            if (!validCategories.Contains(Category))
+                errors.Add("Invalid category");
+
+            var validTypes = new[] { "Counter", "Streak", "Single", "Progressive" };
+            if (!validTypes.Contains(AchievementType))
+                errors.Add("Invalid achievement type");
+
+            if (XPReward < 0)
+                errors.Add("XP reward cannot be negative");
+
+            if (TargetValue.HasValue && TargetValue <= 0)
+                errors.Add("Target value must be positive if specified");
+
+            if (!string.IsNullOrWhiteSpace(TitleReward) && TitleReward.Length > 50)
+                errors.Add("Title reward is too long");
+
+            // Validaciones específicas por tipo
+            if (AchievementType == "Streak" && (!TargetValue.HasValue || TargetValue <= 0))
+                errors.Add("Streak achievements must have a positive target value");
+
+            if (AchievementType == "Counter" && (!TargetValue.HasValue || TargetValue <= 0))
+                errors.Add("Counter achievements must have a positive target value");
+
+            return errors;
+        }
+
+        // Override para mejor debugging
+        public override string ToString()
+        {
+            return $"{Category} Achievement: {AchievementName} ({GetDifficultyLevel()})";
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is Achievement other)
+            {
+                return AchievementID == other.AchievementID;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return AchievementID.GetHashCode();
         }
     }
 }

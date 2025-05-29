@@ -30,6 +30,7 @@ namespace HunterFitness.API.Models
         public decimal? TargetDistance { get; set; } // en metros
 
         // Recompensas y dificultad
+        [Required]
         [StringLength(10)]
         public string Difficulty { get; set; } = "Easy"; // Easy, Medium, Hard, Extreme
 
@@ -42,6 +43,7 @@ namespace HunterFitness.API.Models
         // Requisitos
         public int MinLevel { get; set; } = 1;
 
+        [Required]
         [StringLength(10)]
         public string MinRank { get; set; } = "E";
 
@@ -64,9 +66,10 @@ namespace HunterFitness.API.Models
                 {"A", 5}, {"S", 6}, {"SS", 7}, {"SSS", 8}
             };
 
-            if (rankOrder.ContainsKey(MinRank) && rankOrder.ContainsKey(hunter.HunterRank))
+            if (rankOrder.TryGetValue(MinRank, out var requiredRankValue) && 
+                rankOrder.TryGetValue(hunter.HunterRank, out var hunterRankValue))
             {
-                return rankOrder[hunter.HunterRank] >= rankOrder[MinRank];
+                return hunterRankValue >= requiredRankValue;
             }
 
             return true;
@@ -116,6 +119,314 @@ namespace HunterFitness.API.Models
                 "Mixed" => 25,
                 _ => 15
             };
+        }
+
+        // Métodos adicionales para análisis
+        public bool IsCardioQuest()
+        {
+            return QuestType == "Cardio";
+        }
+
+        public bool IsStrengthQuest()
+        {
+            return QuestType == "Strength";
+        }
+
+        public bool IsFlexibilityQuest()
+        {
+            return QuestType == "Flexibility";
+        }
+
+        public bool IsEnduranceQuest()
+        {
+            return QuestType == "Endurance";
+        }
+
+        public bool IsMixedQuest()
+        {
+            return QuestType == "Mixed";
+        }
+
+        public bool IsEasyDifficulty()
+        {
+            return Difficulty == "Easy";
+        }
+
+        public bool IsMediumDifficulty()
+        {
+            return Difficulty == "Medium";
+        }
+
+        public bool IsHardDifficulty()
+        {
+            return Difficulty == "Hard";
+        }
+
+        public bool IsExtremeDifficulty()
+        {
+            return Difficulty == "Extreme";
+        }
+
+        public bool HasRepsTarget()
+        {
+            return TargetReps.HasValue && TargetReps > 0;
+        }
+
+        public bool HasSetsTarget()
+        {
+            return TargetSets.HasValue && TargetSets > 0;
+        }
+
+        public bool HasDurationTarget()
+        {
+            return TargetDuration.HasValue && TargetDuration > 0;
+        }
+
+        public bool HasDistanceTarget()
+        {
+            return TargetDistance.HasValue && TargetDistance > 0;
+        }
+
+        public string GetTargetDescription()
+        {
+            var targets = new List<string>();
+
+            if (HasRepsTarget())
+                targets.Add($"{TargetReps} reps");
+
+            if (HasSetsTarget())
+                targets.Add($"{TargetSets} sets");
+
+            if (HasDurationTarget())
+            {
+                var duration = TimeSpan.FromSeconds(TargetDuration!.Value);
+                if (duration.TotalMinutes >= 1)
+                    targets.Add($"{duration.Minutes}m {duration.Seconds}s");
+                else
+                    targets.Add($"{duration.Seconds}s");
+            }
+
+            if (HasDistanceTarget())
+                targets.Add($"{TargetDistance:F1}m");
+
+            return targets.Any() ? string.Join(", ", targets) : "Complete exercise";
+        }
+
+        public string GetRequirementsText()
+        {
+            var requirements = new List<string>();
+
+            if (MinLevel > 1)
+                requirements.Add($"Level {MinLevel}+");
+
+            if (MinRank != "E")
+                requirements.Add($"{MinRank} Rank+");
+
+            return requirements.Any() ? string.Join(", ", requirements) : "No requirements";
+        }
+
+        public int GetTotalStatBonus()
+        {
+            return StrengthBonus + AgilityBonus + VitalityBonus + EnduranceBonus;
+        }
+
+        public bool HasStatBonuses()
+        {
+            return GetTotalStatBonus() > 0;
+        }
+
+        public string GetStatBonusDescription()
+        {
+            var bonuses = new List<string>();
+
+            if (StrengthBonus > 0)
+                bonuses.Add($"+{StrengthBonus} STR");
+            
+            if (AgilityBonus > 0)
+                bonuses.Add($"+{AgilityBonus} AGI");
+            
+            if (VitalityBonus > 0)
+                bonuses.Add($"+{VitalityBonus} VIT");
+            
+            if (EnduranceBonus > 0)
+                bonuses.Add($"+{EnduranceBonus} END");
+
+            return bonuses.Any() ? string.Join(", ", bonuses) : "No stat bonuses";
+        }
+
+        public string GetDominantStat()
+        {
+            var stats = new Dictionary<string, int>
+            {
+                {"Strength", StrengthBonus},
+                {"Agility", AgilityBonus},
+                {"Vitality", VitalityBonus},
+                {"Endurance", EnduranceBonus}
+            };
+
+            var maxStat = stats.OrderByDescending(s => s.Value).FirstOrDefault();
+            return maxStat.Value > 0 ? maxStat.Key : "Balanced";
+        }
+
+        public int GetDifficultyValue()
+        {
+            return Difficulty switch
+            {
+                "Easy" => 1,
+                "Medium" => 2,
+                "Hard" => 3,
+                "Extreme" => 4,
+                _ => 0
+            };
+        }
+
+        public string GetDifficultyStars()
+        {
+            return Difficulty switch
+            {
+                "Easy" => "⭐",
+                "Medium" => "⭐⭐",
+                "Hard" => "⭐⭐⭐",
+                "Extreme" => "⭐⭐⭐⭐",
+                _ => ""
+            };
+        }
+
+        public string GetEstimatedTimeText()
+        {
+            var minutes = GetEstimatedTimeMinutes();
+            return minutes >= 60 
+                ? $"{minutes / 60}h {minutes % 60}m"
+                : $"{minutes} min";
+        }
+
+        public bool IsHighXPReward()
+        {
+            return BaseXPReward >= 500;
+        }
+
+        public bool IsLowXPReward()
+        {
+            return BaseXPReward < 100;
+        }
+
+        public bool RequiresHighLevel()
+        {
+            return MinLevel >= 25;
+        }
+
+        public bool RequiresHighRank()
+        {
+            var highRanks = new[] { "A", "S", "SS", "SSS" };
+            return highRanks.Contains(MinRank);
+        }
+
+        public string GetQuestClassification()
+        {
+            if (IsExtremeDifficulty() && RequiresHighRank())
+                return "Elite Challenge";
+            else if (IsHardDifficulty() && RequiresHighLevel())
+                return "Advanced Quest";
+            else if (IsMediumDifficulty())
+                return "Standard Quest";
+            else
+                return "Beginner Quest";
+        }
+
+        public Dictionary<string, object> GetQuestSummary()
+        {
+            return new Dictionary<string, object>
+            {
+                {"Name", QuestName},
+                {"Type", QuestType},
+                {"Exercise", ExerciseName},
+                {"Difficulty", Difficulty},
+                {"BaseXP", BaseXPReward},
+                {"EstimatedTime", GetEstimatedTimeText()},
+                {"Requirements", GetRequirementsText()},
+                {"Targets", GetTargetDescription()},
+                {"StatBonuses", GetStatBonusDescription()},
+                {"Classification", GetQuestClassification()}
+            };
+        }
+
+        // Validaciones
+        public List<string> ValidateData()
+        {
+            var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(QuestName))
+                errors.Add("Quest name is required");
+
+            if (string.IsNullOrWhiteSpace(Description))
+                errors.Add("Description is required");
+
+            if (string.IsNullOrWhiteSpace(ExerciseName))
+                errors.Add("Exercise name is required");
+
+            var validTypes = new[] { "Cardio", "Strength", "Flexibility", "Endurance", "Mixed" };
+            if (!validTypes.Contains(QuestType))
+                errors.Add("Invalid quest type");
+
+            var validDifficulties = new[] { "Easy", "Medium", "Hard", "Extreme" };
+            if (!validDifficulties.Contains(Difficulty))
+                errors.Add("Invalid difficulty");
+
+            var validRanks = new[] { "E", "D", "C", "B", "A", "S", "SS", "SSS" };
+            if (!validRanks.Contains(MinRank))
+                errors.Add("Invalid minimum rank");
+
+            if (MinLevel < 1)
+                errors.Add("Minimum level must be at least 1");
+
+            if (BaseXPReward < 0)
+                errors.Add("Base XP reward cannot be negative");
+
+            if (TargetReps.HasValue && TargetReps <= 0)
+                errors.Add("Target reps must be positive if specified");
+
+            if (TargetSets.HasValue && TargetSets <= 0)
+                errors.Add("Target sets must be positive if specified");
+
+            if (TargetDuration.HasValue && TargetDuration <= 0)
+                errors.Add("Target duration must be positive if specified");
+
+            if (TargetDistance.HasValue && TargetDistance <= 0)
+                errors.Add("Target distance must be positive if specified");
+
+            if (StrengthBonus < 0 || AgilityBonus < 0 || VitalityBonus < 0 || EnduranceBonus < 0)
+                errors.Add("Stat bonuses cannot be negative");
+
+            // Validar que al menos un target esté definido
+            if (!HasRepsTarget() && !HasSetsTarget() && !HasDurationTarget() && !HasDistanceTarget())
+                errors.Add("At least one target (reps, sets, duration, or distance) must be specified");
+
+            return errors;
+        }
+
+        public bool IsRecentlyCreated(int days = 30)
+        {
+            return DateTime.UtcNow - CreatedAt <= TimeSpan.FromDays(days);
+        }
+
+        // Override para mejor debugging
+        public override string ToString()
+        {
+            return $"{QuestType} Quest: {QuestName} ({Difficulty}) - {GetTargetDescription()}";
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is DailyQuest other)
+            {
+                return QuestID == other.QuestID;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return QuestID.GetHashCode();
         }
     }
 }

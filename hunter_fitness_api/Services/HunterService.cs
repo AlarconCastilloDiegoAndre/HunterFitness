@@ -46,7 +46,7 @@ namespace HunterFitness.API.Services
                     return null;
                 }
 
-                return await ConvertToHunterProfileDto(hunter);
+                return await ConvertToHunterProfileDtoAsync(hunter);
             }
             catch (Exception ex)
             {
@@ -172,8 +172,9 @@ namespace HunterFitness.API.Services
                     .ThenByDescending(h => h.Level)
                     .ThenByDescending(h => h.LongestStreak)
                     .Take(limit)
-                    .Select(h => new LeaderboardEntryDto
+                    .Select((h, index) => new LeaderboardEntryDto
                     {
+                        Rank = index + 1,
                         HunterID = h.HunterID,
                         Username = h.Username,
                         HunterName = h.HunterName,
@@ -189,12 +190,6 @@ namespace HunterFitness.API.Services
                         RankChange = "=" // TODO: Implementar cambio de ranking
                     })
                     .ToListAsync();
-
-                // Asignar rankings
-                for (int i = 0; i < hunters.Count; i++)
-                {
-                    hunters[i].Rank = i + 1;
-                }
 
                 return hunters;
             }
@@ -225,7 +220,7 @@ namespace HunterFitness.API.Services
                 var agilityBonus = equippedItems.Sum(e => e.Equipment?.AgilityBonus ?? 0);
                 var vitalityBonus = equippedItems.Sum(e => e.Equipment?.VitalityBonus ?? 0);
                 var enduranceBonus = equippedItems.Sum(e => e.Equipment?.EnduranceBonus ?? 0);
-                var xpMultiplier = equippedItems.Where(e => e.Equipment != null).Sum(e => e.Equipment.XPMultiplier - 1.0m) + 1.0m;
+                var xpMultiplier = equippedItems.Where(e => e.Equipment != null).Sum(e => e.Equipment!.XPMultiplier - 1.0m) + 1.0m;
 
                 return new HunterStatsDto
                 {
@@ -273,7 +268,7 @@ namespace HunterFitness.API.Services
 
                 // Obtener achievements recientes (últimos 7 días)
                 var recentAchievements = hunter.Achievements?
-                    .Where(a => a.IsUnlocked && a.UnlockedAt >= DateTime.UtcNow.AddDays(-7))
+                    .Where(a => a.IsUnlocked && a.UnlockedAt.HasValue && a.UnlockedAt >= DateTime.UtcNow.AddDays(-7))
                     .Select(a => new RecentAchievementDto
                     {
                         AchievementID = a.Achievement.AchievementID,
@@ -360,20 +355,15 @@ namespace HunterFitness.API.Services
                 hunter.CurrentXP += xpAmount;
                 hunter.TotalXP += xpAmount;
 
-                // Verificar level up
-                while (hunter.CanLevelUp())
-                {
-                    var xpRequired = hunter.GetXPRequiredForNextLevel();
-                    hunter.CurrentXP -= xpRequired;
-                    hunter.Level++;
-                    
-                    _logger.LogInformation("🎉 LEVEL UP! Hunter {HunterID} reached level {Level}", hunterId, hunter.Level);
-                }
-
-                // Actualizar rank basado en nivel
-                hunter.UpdateRankBasedOnLevel();
+                // Verificar level up usando el método del modelo
+                hunter.ProcessLevelUp();
 
                 await _context.SaveChangesAsync();
+
+                if (hunter.Level > oldLevel)
+                {
+                    _logger.LogInformation("🎉 LEVEL UP! Hunter {HunterID} reached level {Level}", hunterId, hunter.Level);
+                }
 
                 _logger.LogInformation("⭐ XP Added: {XP} to Hunter {HunterID} from {Source}", xpAmount, hunterId, source);
 
@@ -472,15 +462,20 @@ namespace HunterFitness.API.Services
             }
         }
 
-        private async Task<HunterProfileDto> ConvertToHunterProfileDto(Hunter hunter)
+        private async Task<HunterProfileDto> ConvertToHunterProfileDtoAsync(Hunter hunter)
         {
             // Asegurar que equipment esté cargado
-            if (hunter.Equipment == null || !hunter.Equipment.Any())
+            if (hunter.Equipment?.Any() != true)
             {
-                hunter = await _context.Hunters
+                var hunterWithEquipment = await _context.Hunters
                     .Include(h => h.Equipment.Where(e => e.IsEquipped))
                         .ThenInclude(e => e.Equipment)
-                    .FirstOrDefaultAsync(h => h.HunterID == hunter.HunterID) ?? hunter;
+                    .FirstOrDefaultAsync(h => h.HunterID == hunter.HunterID);
+
+                if (hunterWithEquipment != null)
+                {
+                    hunter = hunterWithEquipment;
+                }
             }
 
             // Obtener equipment equipado

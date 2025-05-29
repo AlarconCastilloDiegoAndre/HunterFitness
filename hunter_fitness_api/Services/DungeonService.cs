@@ -22,16 +22,13 @@ namespace HunterFitness.API.Services
     {
         private readonly HunterFitnessDbContext _context;
         private readonly ILogger<DungeonService> _logger;
-        private readonly IHunterService _hunterService;
 
         public DungeonService(
             HunterFitnessDbContext context,
-            ILogger<DungeonService> logger,
-            IHunterService hunterService)
+            ILogger<DungeonService> logger)
         {
             _context = context;
             _logger = logger;
-            _hunterService = hunterService;
         }
 
         public async Task<List<DungeonDto>> GetAvailableDungeonsAsync(Guid hunterId)
@@ -300,8 +297,9 @@ namespace HunterFitness.API.Services
                 // Si fue exitoso, otorgar recompensas
                 if (completeDto.Successful)
                 {
-                    await _hunterService.AddXPAsync(hunterId, raid.XPEarned, $"Dungeon: {raid.Dungeon.DungeonName}");
-                    await _hunterService.IncrementWorkoutCountAsync(hunterId);
+                    // Agregar XP directamente al hunter (sin dependencia circular)
+                    await AddXPToHunterAsync(hunterId, raid.XPEarned, $"Dungeon: {raid.Dungeon.DungeonName}");
+                    await IncrementWorkoutCountAsync(hunterId);
 
                     // TODO: Posible drop de equipment
                     // TODO: Actualizar achievements
@@ -428,7 +426,55 @@ namespace HunterFitness.API.Services
             }
         }
 
-        // Helper methods
+        // Helper methods - internos para evitar dependencia circular
+        private async Task<bool> AddXPToHunterAsync(Guid hunterId, int xpAmount, string source)
+        {
+            try
+            {
+                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
+                if (hunter == null) return false;
+
+                var oldLevel = hunter.Level;
+                hunter.CurrentXP += xpAmount;
+                hunter.TotalXP += xpAmount;
+
+                // Verificar level up
+                hunter.ProcessLevelUp();
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("⭐ XP Added: {XP} to Hunter {HunterID} from {Source}", xpAmount, hunterId, source);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "💀 Error adding XP: {HunterID}", hunterId);
+                return false;
+            }
+        }
+
+        private async Task<bool> IncrementWorkoutCountAsync(Guid hunterId)
+        {
+            try
+            {
+                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
+                if (hunter == null) return false;
+
+                hunter.TotalWorkouts++;
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("💪 Workout count incremented for Hunter {HunterID}: {Count}", hunterId, hunter.TotalWorkouts);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "💀 Error incrementing workout count: {HunterID}", hunterId);
+                return false;
+            }
+        }
+
         private DungeonDto ConvertToDungeonDto(Dungeon dungeon, Hunter hunter, DungeonRaid? lastRaid)
         {
             var exercises = dungeon.Exercises?.OrderBy(e => e.ExerciseOrder)
@@ -497,7 +543,7 @@ namespace HunterFitness.API.Services
             };
         }
 
-        private DungeonRaidDto ConvertToDungeonRaidDto(DungeonRaid raid)
+        private static DungeonRaidDto ConvertToDungeonRaidDto(DungeonRaid raid)
         {
             return new DungeonRaidDto
             {
@@ -526,7 +572,7 @@ namespace HunterFitness.API.Services
             };
         }
 
-        private string FormatTimeSpan(TimeSpan timeSpan)
+        private static string FormatTimeSpan(TimeSpan timeSpan)
         {
             if (timeSpan.TotalDays >= 1)
                 return $"{(int)timeSpan.TotalDays}d {timeSpan.Hours}h {timeSpan.Minutes}m";
@@ -538,7 +584,7 @@ namespace HunterFitness.API.Services
                 return $"{timeSpan.Seconds}s";
         }
 
-        private string GetRelativeTime(DateTime dateTime)
+        private static string GetRelativeTime(DateTime dateTime)
         {
             var timeSince = DateTime.UtcNow - dateTime;
 

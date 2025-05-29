@@ -63,10 +63,14 @@ namespace HunterFitness.API.Models
         public int GetTotalStatsWithEquipment()
         {
             var baseStats = Strength + Agility + Vitality + Endurance;
-            var equipmentBonus = Equipment?
+            
+            if (Equipment?.Any() != true)
+                return baseStats;
+
+            var equipmentBonus = Equipment
                 .Where(e => e.IsEquipped && e.Equipment != null)
-                .Sum(e => e.Equipment.StrengthBonus + e.Equipment.AgilityBonus + 
-                         e.Equipment.VitalityBonus + e.Equipment.EnduranceBonus) ?? 0;
+                .Sum(e => e.Equipment!.StrengthBonus + e.Equipment.AgilityBonus + 
+                         e.Equipment.VitalityBonus + e.Equipment.EnduranceBonus);
             
             return baseStats + equipmentBonus;
         }
@@ -169,6 +173,180 @@ namespace HunterFitness.API.Models
                 {"JoinedDaysAgo", (DateTime.UtcNow - CreatedAt).Days},
                 {"EquippedItemsCount", Equipment?.Count(e => e.IsEquipped) ?? 0}
             };
+        }
+
+        // Métodos adicionales para estadísticas
+        public int GetEquippedItemsCount()
+        {
+            return Equipment?.Count(e => e.IsEquipped) ?? 0;
+        }
+
+        public decimal GetTotalXPMultiplier()
+        {
+            if (Equipment?.Any() != true)
+                return 1.0m;
+
+            var multiplier = Equipment
+                .Where(e => e.IsEquipped && e.Equipment != null)
+                .Sum(e => e.Equipment!.XPMultiplier - 1.0m);
+
+            return 1.0m + multiplier;
+        }
+
+        public int GetTotalPowerLevel()
+        {
+            if (Equipment?.Any() != true)
+                return 0;
+
+            return Equipment
+                .Where(e => e.IsEquipped && e.Equipment != null)
+                .Sum(e => e.Equipment!.GetPowerLevel());
+        }
+
+        // Métodos para bonificaciones de equipment
+        public int GetEquipmentStrengthBonus()
+        {
+            return Equipment?
+                .Where(e => e.IsEquipped && e.Equipment != null)
+                .Sum(e => e.Equipment!.StrengthBonus) ?? 0;
+        }
+
+        public int GetEquipmentAgilityBonus()
+        {
+            return Equipment?
+                .Where(e => e.IsEquipped && e.Equipment != null)
+                .Sum(e => e.Equipment!.AgilityBonus) ?? 0;
+        }
+
+        public int GetEquipmentVitalityBonus()
+        {
+            return Equipment?
+                .Where(e => e.IsEquipped && e.Equipment != null)
+                .Sum(e => e.Equipment!.VitalityBonus) ?? 0;
+        }
+
+        public int GetEquipmentEnduranceBonus()
+        {
+            return Equipment?
+                .Where(e => e.IsEquipped && e.Equipment != null)
+                .Sum(e => e.Equipment!.EnduranceBonus) ?? 0;
+        }
+
+        // Stats totales con equipment
+        public int GetTotalStrength()
+        {
+            return Strength + GetEquipmentStrengthBonus();
+        }
+
+        public int GetTotalAgility()
+        {
+            return Agility + GetEquipmentAgilityBonus();
+        }
+
+        public int GetTotalVitality()
+        {
+            return Vitality + GetEquipmentVitalityBonus();
+        }
+
+        public int GetTotalEndurance()
+        {
+            return Endurance + GetEquipmentEnduranceBonus();
+        }
+
+        // Validaciones
+        public bool IsEligibleForRankUp()
+        {
+            return HunterRank switch
+            {
+                "E" => Level >= 11,
+                "D" => Level >= 21,
+                "C" => Level >= 36,
+                "B" => Level >= 51,
+                "A" => Level >= 71,
+                "S" => Level >= 86,
+                "SS" => Level >= 96,
+                "SSS" => false, // Máximo rank
+                _ => false
+            };
+        }
+
+        public int GetDaysSinceJoining()
+        {
+            return Math.Max(1, (DateTime.UtcNow - CreatedAt).Days);
+        }
+
+        public decimal GetAverageXPPerDay()
+        {
+            var days = GetDaysSinceJoining();
+            return days > 0 ? (decimal)TotalXP / days : 0;
+        }
+
+        public bool IsNewHunter()
+        {
+            return GetDaysSinceJoining() <= 7;
+        }
+
+        public bool IsVeteranHunter()
+        {
+            return GetDaysSinceJoining() >= 365;
+        }
+
+        public string GetHunterTitle()
+        {
+            if (IsNewHunter())
+                return "Rookie";
+            else if (Level >= 50 && DailyStreak >= 30)
+                return "Dedicated Warrior";
+            else if (LongestStreak >= 100)
+                return "Streak Master";
+            else if (TotalWorkouts >= 1000)
+                return "Workout Legend";
+            else if (IsVeteranHunter())
+                return "Veteran Hunter";
+            else
+                return GetRankDisplayName();
+        }
+
+        // Override para mejor debugging
+        public override string ToString()
+        {
+            return $"Hunter: {HunterName} (Level {Level} {HunterRank}) - {Username}";
+        }
+
+        // Método para validar integridad de datos
+        public List<string> ValidateData()
+        {
+            var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(Username))
+                errors.Add("Username is required");
+
+            if (string.IsNullOrWhiteSpace(Email))
+                errors.Add("Email is required");
+
+            if (string.IsNullOrWhiteSpace(HunterName))
+                errors.Add("Hunter name is required");
+
+            if (Level < 1)
+                errors.Add("Level must be at least 1");
+
+            if (CurrentXP < 0)
+                errors.Add("Current XP cannot be negative");
+
+            if (TotalXP < CurrentXP)
+                errors.Add("Total XP cannot be less than current XP");
+
+            if (Strength < 1 || Agility < 1 || Vitality < 1 || Endurance < 1)
+                errors.Add("All stats must be at least 1");
+
+            if (DailyStreak > LongestStreak)
+                errors.Add("Daily streak cannot be longer than longest streak");
+
+            var validRanks = new[] { "E", "D", "C", "B", "A", "S", "SS", "SSS" };
+            if (!validRanks.Contains(HunterRank))
+                errors.Add("Invalid hunter rank");
+
+            return errors;
         }
     }
 }

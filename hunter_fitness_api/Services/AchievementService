@@ -159,7 +159,7 @@ namespace HunterFitness.API.Services
                 var newlyUnlockedAchievements = new List<AchievementDto>();
 
                 // Obtener achievements relevantes al evento
-                var relevantAchievements = await GetRelevantAchievements(eventType);
+                var relevantAchievements = await GetRelevantAchievementsAsync(eventType);
 
                 foreach (var achievement in relevantAchievements)
                 {
@@ -210,9 +210,8 @@ namespace HunterFitness.API.Services
                     // Verificar si se desbloqueó
                     if (hunterAchievement.IsUnlocked && oldProgress < (achievement.TargetValue ?? 1))
                     {
-                        // Achievement recién desbloqueado - agregar XP
-                        hunter.CurrentXP += achievement.XPReward;
-                        hunter.TotalXP += achievement.XPReward;
+                        // Achievement recién desbloqueado - agregar XP usando método interno
+                        await AddXPToHunterAsync(hunterId, achievement.XPReward, $"Achievement: {achievement.AchievementName}");
                         
                         var dto = ConvertToAchievementDto(achievement, hunterAchievement, hunter);
                         newlyUnlockedAchievements.Add(dto);
@@ -257,13 +256,8 @@ namespace HunterFitness.API.Services
 
                 hunterAchievement.UnlockAchievement();
                 
-                // Otorgar XP al hunter
-                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId);
-                if (hunter != null)
-                {
-                    hunter.CurrentXP += achievement.XPReward;
-                    hunter.TotalXP += achievement.XPReward;
-                }
+                // Otorgar XP al hunter usando método interno
+                await AddXPToHunterAsync(hunterId, achievement.XPReward, $"Achievement: {achievement.AchievementName}");
 
                 await _context.SaveChangesAsync();
 
@@ -355,8 +349,34 @@ namespace HunterFitness.API.Services
             }
         }
 
-        // Helper methods
-        private async Task<List<Achievement>> GetRelevantAchievements(string eventType)
+        // Helper methods - internos para evitar dependencia circular
+        private async Task<bool> AddXPToHunterAsync(Guid hunterId, int xpAmount, string source)
+        {
+            try
+            {
+                var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
+                if (hunter == null) return false;
+
+                hunter.CurrentXP += xpAmount;
+                hunter.TotalXP += xpAmount;
+
+                // Verificar level up usando método del modelo
+                hunter.ProcessLevelUp();
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("⭐ XP Added: {XP} to Hunter {HunterID} from {Source}", xpAmount, hunterId, source);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "💀 Error adding XP: {HunterID}", hunterId);
+                return false;
+            }
+        }
+
+        private async Task<List<Achievement>> GetRelevantAchievementsAsync(string eventType)
         {
             return eventType.ToLower() switch
             {

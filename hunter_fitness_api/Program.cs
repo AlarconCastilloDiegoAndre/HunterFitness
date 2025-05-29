@@ -17,7 +17,8 @@ var host = new HostBuilder()
         services.ConfigureFunctionsApplicationInsights();
         
         // Entity Framework - Usando la cadena de conexión que proporcionaste
-        var connectionString = "Server=tcp:hunter-fitness-server.database.windows.net,1433;Initial Catalog=HunterFitnessDB;Persist Security Info=False;User ID=hunterfitness_admin;Password=HunterFit2025!;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
+        var connectionString = Environment.GetEnvironmentVariable("HunterFitnessDB") ?? 
+                              "Server=tcp:hunter-fitness-server.database.windows.net,1433;Initial Catalog=HunterFitnessDB;Persist Security Info=False;User ID=hunterfitness_admin;Password=HunterFit2025!;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
         
         services.AddDbContext<HunterFitnessDbContext>(options =>
         {
@@ -31,7 +32,8 @@ var host = new HostBuilder()
             });
             
             // Solo en desarrollo
-            if (Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT") == "Development")
+            var environment = Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT");
+            if (environment == "Development")
             {
                 options.EnableSensitiveDataLogging();
                 options.EnableDetailedErrors();
@@ -54,6 +56,8 @@ var host = new HostBuilder()
         services.AddScoped<IHunterService, HunterService>();
         services.AddScoped<IAchievementService, AchievementService>();
         services.AddScoped<IQuestService, QuestService>();
+        
+        // DungeonService y EquipmentService requieren IHunterService, por eso van después
         services.AddScoped<IDungeonService, DungeonService>();
         services.AddScoped<IEquipmentService, EquipmentService>();
     })
@@ -62,38 +66,63 @@ var host = new HostBuilder()
         logging.AddApplicationInsights();
         
         // Solo en desarrollo, mostrar logs detallados
-        if (Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT") == "Development")
+        var environment = Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT");
+        if (environment == "Development")
         {
             logging.SetMinimumLevel(LogLevel.Information);
+        }
+        else
+        {
+            logging.SetMinimumLevel(LogLevel.Warning);
         }
     })
     .Build();
 
 // Verificar conexión a base de datos al iniciar
-using (var scope = host.Services.CreateScope())
+try
 {
-    try
+    using var scope = host.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<HunterFitnessDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    
+    var canConnect = await dbContext.Database.CanConnectAsync();
+    
+    if (canConnect)
     {
-        var dbContext = scope.ServiceProvider.GetRequiredService<HunterFitnessDbContext>();
-        var canConnect = await dbContext.Database.CanConnectAsync();
+        logger.LogInformation("🏹 Hunter Fitness API - Database connection successful!");
+        logger.LogInformation("⚔️ Ready to serve hunters across all realms!");
         
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        
-        if (canConnect)
+        // Intentar aplicar migraciones pendientes en desarrollo
+        var environment = Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT");
+        if (environment == "Development")
         {
-            logger.LogInformation("🏹 Hunter Fitness API - Database connection successful!");
-            logger.LogInformation("⚔️ Ready to serve hunters across all realms!");
-        }
-        else
-        {
-            logger.LogError("❌ Database connection failed!");
+            try
+            {
+                var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync();
+                if (pendingMigrations.Any())
+                {
+                    logger.LogInformation("📊 Applying {Count} pending migrations...", pendingMigrations.Count());
+                    await dbContext.Database.MigrateAsync();
+                    logger.LogInformation("✅ Migrations applied successfully!");
+                }
+            }
+            catch (Exception migrationEx)
+            {
+                logger.LogWarning(migrationEx, "⚠️ Could not apply migrations automatically");
+            }
         }
     }
-    catch (Exception ex)
+    else
     {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "💀 Error during database connection check");
+        logger.LogError("❌ Database connection failed!");
     }
 }
+catch (Exception ex)
+{
+    using var scope = host.Services.CreateScope();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex, "💀 Error during database connection check");
+}
 
+// Iniciar la aplicación
 host.Run();
