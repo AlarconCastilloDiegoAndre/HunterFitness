@@ -16,7 +16,7 @@ var host = new HostBuilder()
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
         
-        // Entity Framework - Usando la cadena de conexión que proporcionaste
+        // Entity Framework - Using connection string
         var connectionString = Environment.GetEnvironmentVariable("HunterFitnessDB") ?? 
                               "Server=tcp:hunter-fitness-server.database.windows.net,1433;Initial Catalog=HunterFitnessDB;Persist Security Info=False;User ID=hunterfitness_admin;Password=HunterFit2025!;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
         
@@ -31,7 +31,7 @@ var host = new HostBuilder()
                 sqlOptions.CommandTimeout(30);
             });
             
-            // Solo en desarrollo
+            // Only in development
             var environment = Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT");
             if (environment == "Development")
             {
@@ -40,7 +40,7 @@ var host = new HostBuilder()
             }
         });
         
-        // CORS para desarrollo
+        // CORS for development
         services.AddCors(options =>
         {
             options.AddDefaultPolicy(builder =>
@@ -51,13 +51,20 @@ var host = new HostBuilder()
             });
         });
         
-        // Servicios personalizados - ORDEN CORRECTO para evitar dependencias circulares
+        // Custom services - CORRECT ORDER to avoid circular dependencies
+        // AuthService first (no dependencies on other custom services)
         services.AddScoped<IAuthService, AuthService>();
+        
+        // HunterService next (depends only on DbContext)
         services.AddScoped<IHunterService, HunterService>();
+        
+        // AchievementService (may depend on HunterService)
         services.AddScoped<IAchievementService, AchievementService>();
+        
+        // QuestService (may depend on HunterService)
         services.AddScoped<IQuestService, QuestService>();
         
-        // DungeonService y EquipmentService requieren IHunterService, por eso van después
+        // DungeonService and EquipmentService require IHunterService, so they go after
         services.AddScoped<IDungeonService, DungeonService>();
         services.AddScoped<IEquipmentService, EquipmentService>();
     })
@@ -65,7 +72,7 @@ var host = new HostBuilder()
     {
         logging.AddApplicationInsights();
         
-        // Solo en desarrollo, mostrar logs detallados
+        // Only in development, show detailed logs
         var environment = Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT");
         if (environment == "Development")
         {
@@ -78,7 +85,7 @@ var host = new HostBuilder()
     })
     .Build();
 
-// Verificar conexión a base de datos al iniciar
+// Verify database connection at startup
 try
 {
     using var scope = host.Services.CreateScope();
@@ -92,7 +99,7 @@ try
         logger.LogInformation("🏹 Hunter Fitness API - Database connection successful!");
         logger.LogInformation("⚔️ Ready to serve hunters across all realms!");
         
-        // Intentar aplicar migraciones pendientes en desarrollo
+        // Try to apply pending migrations in development
         var environment = Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT");
         if (environment == "Development")
         {
@@ -124,5 +131,5 @@ catch (Exception ex)
     logger.LogError(ex, "💀 Error during database connection check");
 }
 
-// Iniciar la aplicación
+// Start the application
 host.Run();

@@ -45,13 +45,15 @@ namespace HunterFitness.API.Data
                 entity.Property(e => e.CreatedAt)
                     .HasDefaultValueSql("GETUTCDATE()");
 
-                // Configurar check constraints
-                entity.HasCheckConstraint("CK_Hunter_HunterRank", 
-                    "HunterRank IN ('E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')");
-                
-                entity.HasCheckConstraint("CK_Hunter_Level", "Level >= 1");
-                entity.HasCheckConstraint("CK_Hunter_Stats", 
-                    "Strength >= 0 AND Agility >= 0 AND Vitality >= 0 AND Endurance >= 0");
+                // Usar ToTable() con check constraints en lugar del método obsoleto
+                entity.ToTable("Hunters", t => 
+                {
+                    t.HasCheckConstraint("CK_Hunter_HunterRank", 
+                        "HunterRank IN ('E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')");
+                    t.HasCheckConstraint("CK_Hunter_Level", "Level >= 1");
+                    t.HasCheckConstraint("CK_Hunter_Stats", 
+                        "Strength >= 0 AND Agility >= 0 AND Vitality >= 0 AND Endurance >= 0");
+                });
             });
 
             // Configuración de DailyQuest
@@ -65,15 +67,17 @@ namespace HunterFitness.API.Data
                 entity.Property(e => e.CreatedAt)
                     .HasDefaultValueSql("GETUTCDATE()");
 
-                entity.HasCheckConstraint("CK_DailyQuest_QuestType",
-                    "QuestType IN ('Cardio', 'Strength', 'Flexibility', 'Endurance', 'Mixed')");
-                
-                entity.HasCheckConstraint("CK_DailyQuest_Difficulty",
-                    "Difficulty IN ('Easy', 'Medium', 'Hard', 'Extreme')");
-
                 // Configurar columna decimal para TargetDistance
                 entity.Property(e => e.TargetDistance)
                     .HasColumnType("decimal(10,2)");
+
+                entity.ToTable("DailyQuests", t =>
+                {
+                    t.HasCheckConstraint("CK_DailyQuest_QuestType",
+                        "QuestType IN ('Cardio', 'Strength', 'Flexibility', 'Endurance', 'Mixed')");
+                    t.HasCheckConstraint("CK_DailyQuest_Difficulty",
+                        "Difficulty IN ('Easy', 'Medium', 'Hard', 'Extreme')");
+                });
             });
 
             // Configuración de HunterDailyQuest
@@ -89,12 +93,6 @@ namespace HunterFitness.API.Data
                 
                 entity.Property(e => e.QuestDate)
                     .HasDefaultValueSql("CAST(GETUTCDATE() AS DATE)");
-
-                entity.HasCheckConstraint("CK_HunterDailyQuest_Status",
-                    "Status IN ('Assigned', 'InProgress', 'Completed', 'Failed')");
-                
-                entity.HasCheckConstraint("CK_HunterDailyQuest_Progress",
-                    "Progress >= 0 AND Progress <= 100");
 
                 // Configurar columnas decimales
                 entity.Property(e => e.Progress)
@@ -116,6 +114,14 @@ namespace HunterFitness.API.Data
                     .WithMany(p => p.HunterDailyQuests)
                     .HasForeignKey(d => d.QuestID)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.ToTable("HunterDailyQuests", t =>
+                {
+                    t.HasCheckConstraint("CK_HunterDailyQuest_Status",
+                        "Status IN ('Assigned', 'InProgress', 'Completed', 'Failed')");
+                    t.HasCheckConstraint("CK_HunterDailyQuest_Progress",
+                        "Progress >= 0 AND Progress <= 100");
+                });
             });
 
             // Configuración de Dungeon
@@ -129,11 +135,13 @@ namespace HunterFitness.API.Data
                 entity.Property(e => e.CreatedAt)
                     .HasDefaultValueSql("GETUTCDATE()");
 
-                entity.HasCheckConstraint("CK_Dungeon_DungeonType",
-                    "DungeonType IN ('Training Grounds', 'Strength Trial', 'Endurance Test', 'Boss Raid')");
-                
-                entity.HasCheckConstraint("CK_Dungeon_Difficulty",
-                    "Difficulty IN ('Normal', 'Hard', 'Extreme', 'Nightmare')");
+                entity.ToTable("Dungeons", t =>
+                {
+                    t.HasCheckConstraint("CK_Dungeon_DungeonType",
+                        "DungeonType IN ('Training Grounds', 'Strength Trial', 'Endurance Test', 'Boss Raid')");
+                    t.HasCheckConstraint("CK_Dungeon_Difficulty",
+                        "Difficulty IN ('Normal', 'Hard', 'Extreme', 'Nightmare')");
+                });
             });
 
             // Configuración de DungeonExercise
@@ -163,12 +171,6 @@ namespace HunterFitness.API.Data
                 entity.Property(e => e.StartedAt)
                     .HasDefaultValueSql("GETUTCDATE()");
 
-                entity.HasCheckConstraint("CK_DungeonRaid_Status",
-                    "Status IN ('Started', 'InProgress', 'Completed', 'Failed', 'Abandoned')");
-                
-                entity.HasCheckConstraint("CK_DungeonRaid_Progress",
-                    "Progress >= 0 AND Progress <= 100");
-
                 // Configurar columnas decimales
                 entity.Property(e => e.Progress)
                     .HasColumnType("decimal(5,2)");
@@ -186,6 +188,14 @@ namespace HunterFitness.API.Data
                     .WithMany(p => p.Raids)
                     .HasForeignKey(d => d.DungeonID)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.ToTable("DungeonRaids", t =>
+                {
+                    t.HasCheckConstraint("CK_DungeonRaid_Status",
+                        "Status IN ('Started', 'InProgress', 'Completed', 'Failed', 'Abandoned')");
+                    t.HasCheckConstraint("CK_DungeonRaid_Progress",
+                        "Progress >= 0 AND Progress <= 100");
+                });
             });
 
             // Configuración de Achievement
@@ -199,11 +209,13 @@ namespace HunterFitness.API.Data
                 entity.Property(e => e.CreatedAt)
                     .HasDefaultValueSql("GETUTCDATE()");
 
-                entity.HasCheckConstraint("CK_Achievement_Category",
-                    "Category IN ('Consistency', 'Strength', 'Endurance', 'Social', 'Special', 'Milestone')");
-                
-                entity.HasCheckConstraint("CK_Achievement_Type",
-                    "AchievementType IN ('Counter', 'Streak', 'Single', 'Progressive')");
+                entity.ToTable("Achievements", t =>
+                {
+                    t.HasCheckConstraint("CK_Achievement_Category",
+                        "Category IN ('Consistency', 'Strength', 'Endurance', 'Social', 'Special', 'Milestone')");
+                    t.HasCheckConstraint("CK_Achievement_Type",
+                        "AchievementType IN ('Counter', 'Streak', 'Single', 'Progressive')");
+                });
             });
 
             // Configuración de HunterAchievement
@@ -239,18 +251,19 @@ namespace HunterFitness.API.Data
                 entity.Property(e => e.CreatedAt)
                     .HasDefaultValueSql("GETUTCDATE()");
 
-                entity.HasCheckConstraint("CK_Equipment_ItemType",
-                    "ItemType IN ('Weapon', 'Armor', 'Accessory')");
-                
-                entity.HasCheckConstraint("CK_Equipment_Rarity",
-                    "Rarity IN ('Common', 'Rare', 'Epic', 'Legendary', 'Mythic')");
-                
-                entity.HasCheckConstraint("CK_Equipment_XPMultiplier",
-                    "XPMultiplier >= 0.5 AND XPMultiplier <= 3.0");
-
                 // Configurar columna decimal para XPMultiplier
                 entity.Property(e => e.XPMultiplier)
                     .HasColumnType("decimal(3,2)");
+
+                entity.ToTable("Equipment", t =>
+                {
+                    t.HasCheckConstraint("CK_Equipment_ItemType",
+                        "ItemType IN ('Weapon', 'Armor', 'Accessory')");
+                    t.HasCheckConstraint("CK_Equipment_Rarity",
+                        "Rarity IN ('Common', 'Rare', 'Epic', 'Legendary', 'Mythic')");
+                    t.HasCheckConstraint("CK_Equipment_XPMultiplier",
+                        "XPMultiplier >= 0.5 AND XPMultiplier <= 3.0");
+                });
             });
 
             // Configuración de HunterEquipment
@@ -288,9 +301,6 @@ namespace HunterFitness.API.Data
                 entity.Property(e => e.CreatedAt)
                     .HasDefaultValueSql("GETUTCDATE()");
 
-                entity.HasCheckConstraint("CK_QuestHistory_BonusMultiplier",
-                    "BonusMultiplier >= 0.5 AND BonusMultiplier <= 5.0");
-
                 // Configurar columnas decimales
                 entity.Property(e => e.BonusMultiplier)
                     .HasColumnType("decimal(3,2)");
@@ -308,6 +318,12 @@ namespace HunterFitness.API.Data
                     .WithMany(p => p.QuestHistory)
                     .HasForeignKey(d => d.QuestID)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.ToTable("QuestHistory", t =>
+                {
+                    t.HasCheckConstraint("CK_QuestHistory_BonusMultiplier",
+                        "BonusMultiplier >= 0.5 AND BonusMultiplier <= 5.0");
+                });
             });
         }
 

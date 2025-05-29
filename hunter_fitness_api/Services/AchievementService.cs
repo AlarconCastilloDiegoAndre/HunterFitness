@@ -25,8 +25,8 @@ namespace HunterFitness.API.Services
             HunterFitnessDbContext context,
             ILogger<AchievementService> logger)
         {
-            _context = context;
-            _logger = logger;
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<HunterAchievementsDto> GetHunterAchievementsAsync(Guid hunterId)

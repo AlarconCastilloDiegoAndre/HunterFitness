@@ -33,8 +33,8 @@ namespace HunterFitness.API.Services
             HunterFitnessDbContext context,
             ILogger<AuthService> logger)
         {
-            _context = context;
-            _logger = logger;
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             
             // Configuración JWT desde environment variables
             _jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? 
@@ -245,7 +245,8 @@ namespace HunterFitness.API.Services
             }
         }
 
-        public async Task<bool> ValidateTokenAsync(string token)
+        // CORREGIDO: Removido async/await innecesario - ahora es método síncrono
+        public Task<bool> ValidateTokenAsync(string token)
         {
             try
             {
@@ -265,11 +266,11 @@ namespace HunterFitness.API.Services
                 };
 
                 var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
-                return validatedToken != null;
+                return Task.FromResult(validatedToken != null);
             }
             catch
             {
-                return false;
+                return Task.FromResult(false);
             }
         }
 
