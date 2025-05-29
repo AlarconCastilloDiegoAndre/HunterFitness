@@ -2,8 +2,44 @@
   "profiles": {
     "hunter_fitness_api": {
       "commandName": "Project",
-      "commandLineArgs": "--port 7207",
-      "launchBrowser": false
+      "commandLineArgs": "--port 7207 --cors *",
+      "launchBrowser": true,
+      "launchUrl": "http://localhost:7207/api/health",
+      "environmentVariables": {
+        "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
+      },
+      "applicationUrl": "http://localhost:7207",
+      "dotnetRunMessages": true,
+      "hotReloadEnabled": true
+    },
+    "Azure Functions Core Tools": {
+      "commandName": "Executable",
+      "executablePath": "func",
+      "commandLineArgs": "start --port 7207 --cors * --verbose",
+      "workingDirectory": ".",
+      "launchBrowser": true,
+      "launchUrl": "http://localhost:7207/api/health",
+      "environmentVariables": {
+        "AZURE_FUNCTIONS_ENVIRONMENT": "Development"
+      }
+    },
+    "Docker": {
+      "commandName": "Docker",
+      "launchBrowser": true,
+      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}/api/health",
+      "environmentVariables": {
+        "AZURE_FUNCTIONS_ENVIRONMENT": "Development"
+      },
+      "publishAllPorts": true,
+      "useSSL": false
+    }
+  },
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:7207",
+      "sslPort": 0
     }
   }
 }

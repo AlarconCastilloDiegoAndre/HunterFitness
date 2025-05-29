@@ -4,13 +4,82 @@
     "applicationInsights": {
       "samplingSettings": {
         "isEnabled": true,
-        "excludedTypes": "Request"
-      }
-    }
+        "maxTelemetryItemsPerSecond": 20,
+        "excludedTypes": "Request;Exception;Trace"
+      },
+      "enableLiveMetricsFilters": true
+    },
+    "logLevel": {
+      "default": "Information",
+      "Microsoft": "Warning",
+      "Microsoft.EntityFrameworkCore": "Warning",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.Azure.Functions.Worker": "Information",
+      "HunterFitness.API": "Information"
+    },
+    "console": {
+      "isEnabled": true
+    },
+    "fileLoggingMode": "debugOnly"
   },
   "extensionBundle": {
     "id": "Microsoft.Azure.Functions.ExtensionBundle",
     "version": "[4.*, 5.0.0)"
   },
-  "functionTimeout": "00:05:00"
+  "functionTimeout": "00:10:00",
+  "healthMonitor": {
+    "enabled": true,
+    "healthCheckInterval": "00:00:30",
+    "healthCheckWindow": "00:02:00",
+    "healthCheckThreshold": 6,
+    "counterThreshold": 0.80
+  },
+  "http": {
+    "routePrefix": "api",
+    "maxOutstandingRequests": 200,
+    "maxConcurrentRequests": 100,
+    "dynamicThrottlesEnabled": true,
+    "hsts": {
+      "isEnabled": false
+    },
+    "cors": {
+      "allowedOrigins": ["*"],
+      "allowedMethods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      "allowedHeaders": ["*"],
+      "allowCredentials": false
+    }
+  },
+  "retry": {
+    "strategy": "exponentialBackoff",
+    "maxRetryCount": 3,
+    "minimumInterval": "00:00:02",
+    "maximumInterval": "00:00:30"
+  },
+  "concurrency": {
+    "dynamicConcurrencyEnabled": true,
+    "snapshotPersistenceEnabled": true
+  },
+  "customHandler": {
+    "description": {
+      "defaultExecutablePath": "",
+      "workingDirectory": "",
+      "arguments": []
+    }
+  },
+  "managedDependency": {
+    "enabled": true
+  },
+  "singleton": {
+    "lockPeriod": "00:00:15",
+    "listenerLockPeriod": "00:01:00",
+    "listenerLockRecoveryPollingInterval": "00:01:00",
+    "lockAcquisitionTimeout": "00:01:00",
+    "lockAcquisitionPollingInterval": "00:00:03"
+  },
+  "watchDirectories": [
+    "Shared"
+  ],
+  "watchFiles": [
+    "host.json"
+  ]
 }

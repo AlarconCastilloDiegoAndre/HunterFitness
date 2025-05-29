@@ -123,7 +123,7 @@ namespace HunterFitness.API.Services
 
                 var achievements = await _context.Achievements
                     .Where(a => a.IsActive && !a.IsHidden)
-                    .OrderBy(a => a.Category)
+                    .OrderBy(a => a.Category)  
                     .ThenBy(a => a.AchievementName)
                     .ToListAsync();
 
@@ -357,6 +357,7 @@ namespace HunterFitness.API.Services
                 var hunter = await _context.Hunters.FirstOrDefaultAsync(h => h.HunterID == hunterId && h.IsActive);
                 if (hunter == null) return false;
 
+                var oldLevel = hunter.Level;
                 hunter.CurrentXP += xpAmount;
                 hunter.TotalXP += xpAmount;
 
@@ -364,6 +365,11 @@ namespace HunterFitness.API.Services
                 hunter.ProcessLevelUp();
 
                 await _context.SaveChangesAsync();
+
+                if (hunter.Level > oldLevel)
+                {
+                    _logger.LogInformation("🎉 LEVEL UP! Hunter {HunterID} reached level {Level}", hunterId, hunter.Level);
+                }
 
                 _logger.LogInformation("⭐ XP Added: {XP} to Hunter {HunterID} from {Source}", xpAmount, hunterId, source);
 

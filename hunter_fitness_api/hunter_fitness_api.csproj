@@ -1,82 +1,48 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+  
+  <!-- Configuración principal del proyecto -->
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <AzureFunctionsVersion>v4</AzureFunctionsVersion>
     <OutputType>Exe</OutputType>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AssemblyTitle>Hunter Fitness API</AssemblyTitle>
+    <Product>Hunter Fitness</Product>
+    <Description>Gamified fitness tracking API inspired by Solo Leveling</Description>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Copyright>Copyright © 2025 Hunter Fitness</Copyright>
+    <Company>Hunter Fitness</Company>
+    <Authors>Hunter Fitness Team</Authors>
+  </PropertyGroup>
+
+  <!-- Configuración de compilación -->
+  <PropertyGroup>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <WarningsAsErrors />
     <WarningsNotAsErrors />
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CS8618;CS8625;CS8601;CS8602;CS8603;CS8604</NoWarn>
   </PropertyGroup>
-  
-  <ItemGroup>
-    <!-- Azure Functions Core - Versiones más recientes -->
-    <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="1.23.0" />
-    <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="1.17.4" />
-    <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.2.0" />
-    <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="1.3.2" />
-    <PackageReference Include="Microsoft.Azure.Functions.Worker.ApplicationInsights" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.ApplicationInsights" Version="2.22.0" />
-    <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="2.22.0" />
-    
-    <!-- Entity Framework Core - Versiones actualizadas -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.8" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.8" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.8" />
-    
-    <!-- JWT Authentication - Versiones más recientes -->
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.1.0" />
-    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.1.0" />
-    
-    <!-- Security - Versión actualizada -->
-    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
-    
-    <!-- JSON - Versiones más recientes -->
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="System.Text.Json" Version="8.0.4" />
-    
-    <!-- Configuration - Versiones actualizadas -->
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.AzureAppConfiguration" Version="7.3.0" />
-    
-    <!-- Validation - Versión actualizada -->
-    <PackageReference Include="FluentValidation" Version="11.10.0" />
-    
-    <!-- Additional Dependencies - Versiones actualizadas -->
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
-    
-    <!-- Paquetes adicionales útiles -->
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
-    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <None Update="host.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="local.settings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
-    </None>
-  </ItemGroup>
 
-  <!-- Configuración adicional para mejor compilación -->
+  <!-- Configuración específica para Debug -->
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
     <Optimize>false</Optimize>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
+  <!-- Configuración específica para Release -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <DefineConstants>TRACE</DefineConstants>
     <DebugType>pdbonly</DebugType>
     <DebugSymbols>true</DebugSymbols>
     <Optimize>true</Optimize>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <!-- Configuración para análisis de código -->
@@ -84,10 +50,156 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
+  </PropertyGroup>
+  
+  <!-- Azure Functions Core - Última versión estable -->
+  <ItemGroup Label="Azure Functions">
+    <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.0.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.0.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.2.0" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="1.3.2" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.ApplicationInsights" Version="1.4.0" />
+  </ItemGroup>
+
+  <!-- Application Insights y Telemetry -->
+  <ItemGroup Label="Monitoring">
+    <PackageReference Include="Microsoft.Extensions.Logging.ApplicationInsights" Version="2.22.0" />
+    <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="2.22.0" />
+    <PackageReference Include="Microsoft.ApplicationInsights.DependencyCollector" Version="2.22.0" />
+  </ItemGroup>
+    
+  <!-- Entity Framework Core - Última versión -->
+  <ItemGroup Label="Entity Framework">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="8.0.11" />
+  </ItemGroup>
+    
+  <!-- JWT Authentication y Security -->
+  <ItemGroup Label="Authentication">
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.2.1" />
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+  </ItemGroup>
+    
+  <!-- JSON y Serialización -->
+  <ItemGroup Label="Serialization">
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+    
+  <!-- Configuración y Options -->
+  <ItemGroup Label="Configuration">
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+  </ItemGroup>
+    
+  <!-- Validación -->
+  <ItemGroup Label="Validation">
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
+  </ItemGroup>
+    
+  <!-- Dependencias principales de .NET -->
+  <ItemGroup Label="Core Dependencies">
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
+  </ItemGroup>
+    
+  <!-- Cache y Performance -->
+  <ItemGroup Label="Caching">
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- HTTP Client -->
+  <ItemGroup Label="HTTP">
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+  </ItemGroup>
+
+  <!-- Testing (solo en Debug) -->
+  <ItemGroup Label="Testing" Condition="'$(Configuration)' == 'Debug'">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.11" />
+  </ItemGroup>
+
+  <!-- Archivos de configuración -->
+  <ItemGroup Label="Configuration Files">
+    <None Update="host.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="local.settings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </None>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Archivos adicionales -->
+  <ItemGroup Label="Additional Files">
+    <None Include="README.md" />
+    <None Include=".gitignore" />
+    <Content Include="query.sql">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Configuración para Azure Deployment -->
+  <PropertyGroup Condition="'$(PublishProfile)' != ''">
+    <WebPublishMethod>MSDeploy</WebPublishMethod>
+    <PublishUrl>https://hunter-fitness-api.scm.azurewebsites.net:443/msdeploy.axd</PublishUrl>
+    <SiteUrlToLaunchAfterPublish>https://hunter-fitness-api.azurewebsites.net</SiteUrlToLaunchAfterPublish>
+    <LaunchSiteAfterPublish>True</LaunchSiteAfterPublish>
+    <ExcludeApp_Data>False</ExcludeApp_Data>
+    <ProjectGuid>{your-project-guid-here}</ProjectGuid>
+    <MSDeployServiceURL>hunter-fitness-api.scm.azurewebsites.net:443</MSDeployServiceURL>
+    <DeployDefaultTarget>WebPublish</DeployDefaultTarget>
+    <RemoteSitePhysicalPath />
+    <SkipExtraFilesOnServer>True</SkipExtraFilesOnServer>
+    <MSDeployPublishMethod>WMSVC</MSDeployPublishMethod>
+    <EnableMSDeployBackup>True</EnableMSDeployBackup>
   </PropertyGroup>
 
-  <!-- Advertencias específicas que queremos suprimir temporalmente -->
+  <!-- Optimizaciones de compilación -->
   <PropertyGroup>
-    <NoWarn>$(NoWarn);CS8618;CS8625</NoWarn>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <RetainVMGarbageCollection>true</RetainVMGarbageCollection>
   </PropertyGroup>
+
+  <!-- Targets personalizados -->
+  <Target Name="DisplayInfo" BeforeTargets="Build">
+    <Message Text="🏹 Building Hunter Fitness API v$(Version)" Importance="high" />
+    <Message Text="⚔️ Configuration: $(Configuration)" Importance="high" />
+    <Message Text="🎯 Target Framework: $(TargetFramework)" Importance="high" />
+  </Target>
+
+  <!-- Limpiar archivos temporales después de build -->
+  <Target Name="CleanupTempFiles" AfterTargets="Build">
+    <ItemGroup>
+      <TempFiles Include="$(OutputPath)**/*.tmp" />
+      <TempFiles Include="$(OutputPath)**/*.temp" />
+    </ItemGroup>
+    <Delete Files="@(TempFiles)" ContinueOnError="true" />
+  </Target>
+
+  <!-- Pre-build: Verificar archivos requeridos -->
+  <Target Name="VerifyRequiredFiles" BeforeTargets="Build">
+    <Warning Text="⚠️ local.settings.json not found - create it for local development" Condition="!Exists('local.settings.json')" />
+    <Warning Text="⚠️ host.json not found - Azure Functions may not work correctly" Condition="!Exists('host.json')" />
+  </Target>
+
 </Project>
