@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HunterFitness.API.Models
 {
@@ -52,7 +51,7 @@ namespace HunterFitness.API.Models
         [StringLength(500)]
         public string? ProfilePictureUrl { get; set; }
 
-        // Navigation Properties
+        // Navigation Properties - CORREGIDO: Nombres correctos
         public virtual ICollection<HunterDailyQuest> DailyQuests { get; set; } = new List<HunterDailyQuest>();
         public virtual ICollection<DungeonRaid> DungeonRaids { get; set; } = new List<DungeonRaid>();
         public virtual ICollection<HunterAchievement> Achievements { get; set; } = new List<HunterAchievement>();
@@ -152,55 +151,25 @@ namespace HunterFitness.API.Models
             return xpRequired > 0 ? (decimal)CurrentXP / xpRequired * 100 : 0;
         }
 
-        public Dictionary<string, object> GetHunterSummary()
+        // Stats totales con equipment
+        public int GetTotalStrength()
         {
-            return new Dictionary<string, object>
-            {
-                {"HunterID", HunterID},
-                {"Username", Username},
-                {"HunterName", HunterName},
-                {"Level", Level},
-                {"Rank", HunterRank},
-                {"RankDisplay", GetRankDisplayName()},
-                {"TotalXP", TotalXP},
-                {"CurrentXP", CurrentXP},
-                {"XPForNextLevel", GetXPRequiredForNextLevel()},
-                {"TotalStats", Strength + Agility + Vitality + Endurance},
-                {"TotalStatsWithEquipment", GetTotalStatsWithEquipment()},
-                {"DailyStreak", DailyStreak},
-                {"LongestStreak", LongestStreak},
-                {"TotalWorkouts", TotalWorkouts},
-                {"JoinedDaysAgo", (DateTime.UtcNow - CreatedAt).Days},
-                {"EquippedItemsCount", Equipment?.Count(e => e.IsEquipped) ?? 0}
-            };
+            return Strength + GetEquipmentStrengthBonus();
         }
 
-        // Métodos adicionales para estadísticas
-        public int GetEquippedItemsCount()
+        public int GetTotalAgility()
         {
-            return Equipment?.Count(e => e.IsEquipped) ?? 0;
+            return Agility + GetEquipmentAgilityBonus();
         }
 
-        public decimal GetTotalXPMultiplier()
+        public int GetTotalVitality()
         {
-            if (Equipment?.Any() != true)
-                return 1.0m;
-
-            var multiplier = Equipment
-                .Where(e => e.IsEquipped && e.Equipment != null)
-                .Sum(e => e.Equipment!.XPMultiplier - 1.0m);
-
-            return 1.0m + multiplier;
+            return Vitality + GetEquipmentVitalityBonus();
         }
 
-        public int GetTotalPowerLevel()
+        public int GetTotalEndurance()
         {
-            if (Equipment?.Any() != true)
-                return 0;
-
-            return Equipment
-                .Where(e => e.IsEquipped && e.Equipment != null)
-                .Sum(e => e.Equipment!.GetPowerLevel());
+            return Endurance + GetEquipmentEnduranceBonus();
         }
 
         // Métodos para bonificaciones de equipment
@@ -232,25 +201,16 @@ namespace HunterFitness.API.Models
                 .Sum(e => e.Equipment!.EnduranceBonus) ?? 0;
         }
 
-        // Stats totales con equipment
-        public int GetTotalStrength()
+        public decimal GetTotalXPMultiplier()
         {
-            return Strength + GetEquipmentStrengthBonus();
-        }
+            if (Equipment?.Any() != true)
+                return 1.0m;
 
-        public int GetTotalAgility()
-        {
-            return Agility + GetEquipmentAgilityBonus();
-        }
+            var multiplier = Equipment
+                .Where(e => e.IsEquipped && e.Equipment != null)
+                .Sum(e => e.Equipment!.XPMultiplier - 1.0m);
 
-        public int GetTotalVitality()
-        {
-            return Vitality + GetEquipmentVitalityBonus();
-        }
-
-        public int GetTotalEndurance()
-        {
-            return Endurance + GetEquipmentEnduranceBonus();
+            return 1.0m + multiplier;
         }
 
         // Validaciones
@@ -289,22 +249,6 @@ namespace HunterFitness.API.Models
         public bool IsVeteranHunter()
         {
             return GetDaysSinceJoining() >= 365;
-        }
-
-        public string GetHunterTitle()
-        {
-            if (IsNewHunter())
-                return "Rookie";
-            else if (Level >= 50 && DailyStreak >= 30)
-                return "Dedicated Warrior";
-            else if (LongestStreak >= 100)
-                return "Streak Master";
-            else if (TotalWorkouts >= 1000)
-                return "Workout Legend";
-            else if (IsVeteranHunter())
-                return "Veteran Hunter";
-            else
-                return GetRankDisplayName();
         }
 
         // Override para mejor debugging

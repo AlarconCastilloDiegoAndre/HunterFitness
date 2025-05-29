@@ -175,5 +175,150 @@ namespace HunterFitness.API.Models
                 _ => "🏆"
             };
         }
+
+        public string GetRelativeTimeUnlocked()
+        {
+            if (!IsUnlocked || !UnlockedAt.HasValue)
+                return "Not unlocked";
+
+            var timeSince = DateTime.UtcNow - UnlockedAt.Value;
+
+            if (timeSince.TotalMinutes < 1)
+                return "Just unlocked";
+            else if (timeSince.TotalHours < 1)
+                return $"{(int)timeSince.TotalMinutes} minutes ago";
+            else if (timeSince.TotalDays < 1)
+                return $"{(int)timeSince.TotalHours} hours ago";
+            else if (timeSince.TotalDays < 7)
+                return $"{(int)timeSince.TotalDays} days ago";
+            else
+                return UnlockedAt.Value.ToString("MMM dd, yyyy");
+        }
+
+        public string GetMotivationalMessage()
+        {
+            if (IsUnlocked)
+                return Achievement?.GetCompletionCelebrationMessage() ?? "Achievement unlocked!";
+
+            var progressPercentage = GetProgressPercentage();
+            return progressPercentage switch
+            {
+                >= 90 => "🔥 So close! You're almost there!",
+                >= 75 => "💪 Great progress! Keep pushing!",
+                >= 50 => "📈 Halfway there! You're doing amazing!",
+                >= 25 => "🌟 Good start! Keep up the momentum!",
+                _ => "🚀 Your journey begins! Every step counts!"
+            };
+        }
+
+        public Dictionary<string, object> GetAchievementProgress()
+        {
+            return new Dictionary<string, object>
+            {
+                {"AchievementName", Achievement?.AchievementName ?? "Unknown"},
+                {"Category", Achievement?.Category ?? "Unknown"},
+                {"CurrentProgress", CurrentProgress},
+                {"TargetValue", Achievement?.TargetValue ?? 0},
+                {"ProgressPercentage", GetProgressPercentage()},
+                {"RemainingProgress", GetRemainingProgress()},
+                {"IsUnlocked", IsUnlocked},
+                {"UnlockedAt", UnlockedAt},
+                {"CanBeUnlocked", CanBeUnlocked()},
+                {"XPReward", Achievement?.XPReward ?? 0},
+                {"TitleReward", Achievement?.TitleReward},
+                {"Difficulty", Achievement?.GetDifficultyLevel() ?? "Unknown"}
+            };
+        }
+
+        public bool IsNearCompletion()
+        {
+            return !IsUnlocked && GetProgressPercentage() >= 75m;
+        }
+
+        public bool HasSignificantProgress()
+        {
+            return CurrentProgress > 0 || IsUnlocked;
+        }
+
+        public string GetProgressBar(int width = 20)
+        {
+            var percentage = GetProgressPercentage();
+            var filledWidth = (int)(width * percentage / 100);
+            var filled = new string('█', filledWidth);
+            var empty = new string('░', width - filledWidth);
+            return $"[{filled}{empty}] {percentage:F0}%";
+        }
+
+        public string GetEstimatedTimeToCompletion()
+        {
+            if (IsUnlocked) return "Completed";
+            if (Achievement?.TargetValue == null) return "Unknown";
+
+            var remaining = GetRemainingProgress();
+            if (remaining <= 0) return "Ready to unlock";
+
+            // Estimación básica basada en progreso actual
+            var daysWithProgress = Math.Max(1, (DateTime.UtcNow - CreatedAt).Days);
+            var progressPerDay = CurrentProgress > 0 ? (double)CurrentProgress / daysWithProgress : 0.5;
+            
+            if (progressPerDay <= 0) return "Unknown";
+
+            var estimatedDays = (int)Math.Ceiling(remaining / progressPerDay);
+            
+            return estimatedDays switch
+            {
+                <= 1 => "Within a day",
+                <= 7 => $"About {estimatedDays} days",
+                <= 30 => $"About {estimatedDays / 7} weeks",
+                _ => $"About {estimatedDays / 30} months"
+            };
+        }
+
+        // Validaciones
+        public List<string> ValidateProgress()
+        {
+            var errors = new List<string>();
+
+            if (Achievement == null)
+                errors.Add("Achievement reference is missing");
+
+            if (Hunter == null)
+                errors.Add("Hunter reference is missing");
+
+            if (CurrentProgress < 0)
+                errors.Add("Progress cannot be negative");
+
+            if (IsUnlocked && !UnlockedAt.HasValue)
+                errors.Add("Unlocked achievements must have unlock date");
+
+            if (!IsUnlocked && UnlockedAt.HasValue)
+                errors.Add("Non-unlocked achievements cannot have unlock date");
+
+            if (Achievement?.TargetValue.HasValue == true && CurrentProgress > Achievement.TargetValue.Value)
+                errors.Add("Progress cannot exceed target value");
+
+            return errors;
+        }
+
+        // Override para mejor debugging
+        public override string ToString()
+        {
+            var status = IsUnlocked ? "Unlocked" : $"{GetProgressPercentage():F0}%";
+            return $"{Achievement?.AchievementName ?? "Unknown"} - {status}";
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is HunterAchievement other)
+            {
+                return HunterAchievementID == other.HunterAchievementID;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return HunterAchievementID.GetHashCode();
+        }
     }
 }

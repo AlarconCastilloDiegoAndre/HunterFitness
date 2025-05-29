@@ -282,5 +282,151 @@ namespace HunterFitness.API.Models
                 {"Requirements", GetRequirementsText()}
             };
         }
+
+        // Métodos adicionales para análisis
+        public bool IsTrainingGrounds() => DungeonType == "Training Grounds";
+        public bool IsStrengthTrial() => DungeonType == "Strength Trial";
+        public bool IsEnduranceTest() => DungeonType == "Endurance Test";
+        
+        public bool IsNormalDifficulty() => Difficulty == "Normal";
+        public bool IsHardDifficulty() => Difficulty == "Hard";
+        public bool IsExtremeDifficulty() => Difficulty == "Extreme";
+        public bool IsNightmareDifficulty() => Difficulty == "Nightmare";
+
+        public bool RequiresHighLevel() => MinLevel >= 25;
+        public bool RequiresHighRank() => new[] { "A", "S", "SS", "SSS" }.Contains(MinRank);
+        public bool HasLongCooldown() => CooldownHours >= 48;
+        public bool IsHighEnergyRequired() => EnergyCost >= 20;
+
+        public string GetDungeonClassification()
+        {
+            if (IsBossRaid() && IsHighDifficulty())
+                return "Elite Boss Raid";
+            else if (IsBossRaid())
+                return "Boss Raid";
+            else if (IsHighDifficulty() && RequiresHighLevel())
+                return "Elite Challenge";
+            else if (IsHardDifficulty())
+                return "Advanced Dungeon";
+            else
+                return "Standard Dungeon";
+        }
+
+        public string GetDifficultyStars()
+        {
+            return Difficulty switch
+            {
+                "Normal" => "⭐",
+                "Hard" => "⭐⭐",
+                "Extreme" => "⭐⭐⭐",
+                "Nightmare" => "⭐⭐⭐⭐",
+                _ => ""
+            };
+        }
+
+        public int GetPowerRequirement()
+        {
+            var basePower = MinLevel * 4; // Stats base esperado
+            var difficultyMultiplier = GetDifficultyValue();
+            return basePower * difficultyMultiplier;
+        }
+
+        public bool IsAvailableForHunter(Hunter hunter, DungeonRaid? lastRaid = null)
+        {
+            if (!IsEligibleForHunter(hunter)) return false;
+            if (lastRaid?.NextAvailableAt.HasValue == true && DateTime.UtcNow < lastRaid.NextAvailableAt.Value)
+                return false;
+            
+            return true;
+        }
+
+        public string GetRecommendedPreparation()
+        {
+            var tips = new List<string>();
+
+            if (IsStrengthTrial())
+                tips.Add("Focus on strength training exercises");
+            else if (IsEnduranceTest())
+                tips.Add("Build up your cardiovascular endurance");
+            else if (IsBossRaid())
+                tips.Add("Ensure all stats are maximized");
+
+            if (IsHighDifficulty())
+                tips.Add("Complete easier dungeons first for practice");
+
+            if (RequiresHighLevel())
+                tips.Add("Continue leveling up through daily quests");
+
+            return tips.Any() ? string.Join("; ", tips) : "Standard preparation recommended";
+        }
+
+        // Validaciones
+        public List<string> ValidateData()
+        {
+            var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(DungeonName))
+                errors.Add("Dungeon name is required");
+
+            if (string.IsNullOrWhiteSpace(Description))
+                errors.Add("Description is required");
+
+            var validTypes = new[] { "Training Grounds", "Strength Trial", "Endurance Test", "Boss Raid" };
+            if (!validTypes.Contains(DungeonType))
+                errors.Add("Invalid dungeon type");
+
+            var validDifficulties = new[] { "Normal", "Hard", "Extreme", "Nightmare" };
+            if (!validDifficulties.Contains(Difficulty))
+                errors.Add("Invalid difficulty");
+
+            var validRanks = new[] { "E", "D", "C", "B", "A", "S", "SS", "SSS" };
+            if (!validRanks.Contains(MinRank))
+                errors.Add("Invalid minimum rank");
+
+            if (MinLevel < 1)
+                errors.Add("Minimum level must be at least 1");
+
+            if (EstimatedDuration <= 0)
+                errors.Add("Estimated duration must be positive");
+
+            if (EnergyCost < 0)
+                errors.Add("Energy cost cannot be negative");
+
+            if (CooldownHours < 0)
+                errors.Add("Cooldown hours cannot be negative");
+
+            if (BaseXPReward < 0)
+                errors.Add("Base XP reward cannot be negative");
+
+            if (BonusXPReward < 0)
+                errors.Add("Bonus XP reward cannot be negative");
+
+            return errors;
+        }
+
+        public bool IsRecentlyCreated(int days = 30)
+        {
+            return DateTime.UtcNow - CreatedAt <= TimeSpan.FromDays(days);
+        }
+
+        // Override para mejor debugging
+        public override string ToString()
+        {
+            return $"{DungeonType}: {DungeonName} ({Difficulty}) - Level {MinLevel}+";
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is Dungeon other)
+            {
+                return DungeonID == other.DungeonID;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return DungeonID.GetHashCode();
+        }
     }
 }

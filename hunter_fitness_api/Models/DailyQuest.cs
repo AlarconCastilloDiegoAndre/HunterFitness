@@ -122,70 +122,21 @@ namespace HunterFitness.API.Models
         }
 
         // Métodos adicionales para análisis
-        public bool IsCardioQuest()
-        {
-            return QuestType == "Cardio";
-        }
+        public bool IsCardioQuest() => QuestType == "Cardio";
+        public bool IsStrengthQuest() => QuestType == "Strength";
+        public bool IsFlexibilityQuest() => QuestType == "Flexibility";
+        public bool IsEnduranceQuest() => QuestType == "Endurance";
+        public bool IsMixedQuest() => QuestType == "Mixed";
 
-        public bool IsStrengthQuest()
-        {
-            return QuestType == "Strength";
-        }
+        public bool IsEasyDifficulty() => Difficulty == "Easy";
+        public bool IsMediumDifficulty() => Difficulty == "Medium";
+        public bool IsHardDifficulty() => Difficulty == "Hard";
+        public bool IsExtremeDifficulty() => Difficulty == "Extreme";
 
-        public bool IsFlexibilityQuest()
-        {
-            return QuestType == "Flexibility";
-        }
-
-        public bool IsEnduranceQuest()
-        {
-            return QuestType == "Endurance";
-        }
-
-        public bool IsMixedQuest()
-        {
-            return QuestType == "Mixed";
-        }
-
-        public bool IsEasyDifficulty()
-        {
-            return Difficulty == "Easy";
-        }
-
-        public bool IsMediumDifficulty()
-        {
-            return Difficulty == "Medium";
-        }
-
-        public bool IsHardDifficulty()
-        {
-            return Difficulty == "Hard";
-        }
-
-        public bool IsExtremeDifficulty()
-        {
-            return Difficulty == "Extreme";
-        }
-
-        public bool HasRepsTarget()
-        {
-            return TargetReps.HasValue && TargetReps > 0;
-        }
-
-        public bool HasSetsTarget()
-        {
-            return TargetSets.HasValue && TargetSets > 0;
-        }
-
-        public bool HasDurationTarget()
-        {
-            return TargetDuration.HasValue && TargetDuration > 0;
-        }
-
-        public bool HasDistanceTarget()
-        {
-            return TargetDistance.HasValue && TargetDistance > 0;
-        }
+        public bool HasRepsTarget() => TargetReps.HasValue && TargetReps > 0;
+        public bool HasSetsTarget() => TargetSets.HasValue && TargetSets > 0;
+        public bool HasDurationTarget() => TargetDuration.HasValue && TargetDuration > 0;
+        public bool HasDistanceTarget() => TargetDistance.HasValue && TargetDistance > 0;
 
         public string GetTargetDescription()
         {
@@ -230,10 +181,7 @@ namespace HunterFitness.API.Models
             return StrengthBonus + AgilityBonus + VitalityBonus + EnduranceBonus;
         }
 
-        public bool HasStatBonuses()
-        {
-            return GetTotalStatBonus() > 0;
-        }
+        public bool HasStatBonuses() => GetTotalStatBonus() > 0;
 
         public string GetStatBonusDescription()
         {
@@ -300,26 +248,10 @@ namespace HunterFitness.API.Models
                 : $"{minutes} min";
         }
 
-        public bool IsHighXPReward()
-        {
-            return BaseXPReward >= 500;
-        }
-
-        public bool IsLowXPReward()
-        {
-            return BaseXPReward < 100;
-        }
-
-        public bool RequiresHighLevel()
-        {
-            return MinLevel >= 25;
-        }
-
-        public bool RequiresHighRank()
-        {
-            var highRanks = new[] { "A", "S", "SS", "SSS" };
-            return highRanks.Contains(MinRank);
-        }
+        public bool IsHighXPReward() => BaseXPReward >= 500;
+        public bool IsLowXPReward() => BaseXPReward < 100;
+        public bool RequiresHighLevel() => MinLevel >= 25;
+        public bool RequiresHighRank() => new[] { "A", "S", "SS", "SSS" }.Contains(MinRank);
 
         public string GetQuestClassification()
         {

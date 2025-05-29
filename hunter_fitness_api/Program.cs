@@ -32,17 +32,13 @@ var host = new HostBuilder()
             });
         });
 
-        // Services - Solo agregar los que existen
+        // Services - Agregando todos los servicios necesarios
+        services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IQuestService, QuestService>();
         services.AddScoped<IHunterService, HunterService>();
         services.AddScoped<IDungeonService, DungeonService>();
         services.AddScoped<IEquipmentService, EquipmentService>();
         services.AddScoped<IAchievementService, AchievementService>();
-        services.AddScoped<AuthService>();
-
-        // DungeonService and EquipmentService require IHunterService, so they go after
-        // services.AddScoped<IDungeonService, DungeonService>();
-        // services.AddScoped<IEquipmentService, EquipmentService>();
     })
     .ConfigureLogging(logging =>
     {

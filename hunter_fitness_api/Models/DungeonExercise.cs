@@ -162,20 +162,9 @@ namespace HunterFitness.API.Models
             };
         }
 
-        public bool HasTimeTarget()
-        {
-            return TargetDuration.HasValue;
-        }
-
-        public bool HasRepTarget()
-        {
-            return TargetReps.HasValue;
-        }
-
-        public bool HasSetTarget()
-        {
-            return TargetSets.HasValue;
-        }
+        public bool HasTimeTarget() => TargetDuration.HasValue;
+        public bool HasRepTarget() => TargetReps.HasValue;
+        public bool HasSetTarget() => TargetSets.HasValue;
 
         public string GetInstructions()
         {
@@ -282,6 +271,133 @@ namespace HunterFitness.API.Models
                 >= 25 => "📈 Good progress! Stay focused!",
                 _ => "⚡ Let's begin! You've got this!"
             };
+        }
+
+        public int GetIntensityLevel()
+        {
+            var baseIntensity = 1;
+
+            // Aumentar intensidad basado en targets
+            if (TargetReps.HasValue && TargetReps > 30) baseIntensity++;
+            if (TargetSets.HasValue && TargetSets > 3) baseIntensity++;
+            if (TargetDuration.HasValue && TargetDuration > 300) baseIntensity++; // Más de 5 minutos
+            if (RestTimeSeconds < 30) baseIntensity++; // Poco descanso = más intensidad
+
+            return Math.Min(5, baseIntensity);
+        }
+
+        public string GetIntensityDescription()
+        {
+            return GetIntensityLevel() switch
+            {
+                1 => "Low Intensity",
+                2 => "Moderate Intensity",
+                3 => "High Intensity",
+                4 => "Very High Intensity",
+                5 => "Maximum Intensity",
+                _ => "Unknown Intensity"
+            };
+        }
+
+        public bool IsCardioExercise()
+        {
+            var cardioKeywords = new[] { "run", "cardio", "bike", "jump", "burpee", "mountain climber" };
+            return cardioKeywords.Any(keyword => ExerciseName.ToLower().Contains(keyword));
+        }
+
+        public bool IsStrengthExercise()
+        {
+            var strengthKeywords = new[] { "push", "pull", "lift", "squat", "press", "curl" };
+            return strengthKeywords.Any(keyword => ExerciseName.ToLower().Contains(keyword));
+        }
+
+        public bool IsFlexibilityExercise()
+        {
+            var flexibilityKeywords = new[] { "stretch", "yoga", "mobility", "flexibility" };
+            return flexibilityKeywords.Any(keyword => ExerciseName.ToLower().Contains(keyword));
+        }
+
+        public string GetExerciseIcon()
+        {
+            return GetExerciseTypeGuess() switch
+            {
+                "Strength" => "💪",
+                "Cardio" => "🏃‍♂️",
+                "Flexibility" => "🤸‍♂️",
+                "Endurance" => "⏱️",
+                _ => "⚡"
+            };
+        }
+
+        public Dictionary<string, object> GetExerciseSummary()
+        {
+            return new Dictionary<string, object>
+            {
+                {"Name", ExerciseName},
+                {"Order", ExerciseOrder},
+                {"Type", GetExerciseTypeGuess()},
+                {"Difficulty", GetDifficultyEstimate()},
+                {"Intensity", GetIntensityDescription()},
+                {"Targets", GetTargetDescription()},
+                {"EstimatedTime", GetEstimatedTimeDescription()},
+                {"RestTime", GetRestTimeDescription()},
+                {"Instructions", GetInstructions()}
+            };
+        }
+
+        // Validaciones
+        public List<string> ValidateData()
+        {
+            var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(ExerciseName))
+                errors.Add("Exercise name is required");
+
+            if (ExerciseOrder < 1)
+                errors.Add("Exercise order must be at least 1");
+
+            if (TargetReps.HasValue && TargetReps <= 0)
+                errors.Add("Target reps must be positive if specified");
+
+            if (TargetSets.HasValue && TargetSets <= 0)
+                errors.Add("Target sets must be positive if specified");
+
+            if (TargetDuration.HasValue && TargetDuration <= 0)
+                errors.Add("Target duration must be positive if specified");
+
+            if (RestTimeSeconds < 0)
+                errors.Add("Rest time cannot be negative");
+
+            // Validar que al menos un target esté definido
+            if (!HasRepTarget() && !HasSetTarget() && !HasTimeTarget())
+                errors.Add("At least one target (reps, sets, or duration) must be specified");
+
+            return errors;
+        }
+
+        public bool IsRecentlyCreated(int days = 30)
+        {
+            return DateTime.UtcNow - CreatedAt <= TimeSpan.FromDays(days);
+        }
+
+        // Override para mejor debugging
+        public override string ToString()
+        {
+            return $"Exercise {ExerciseOrder}: {ExerciseName} - {GetTargetDescription()}";
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is DungeonExercise other)
+            {
+                return ExerciseID == other.ExerciseID;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return ExerciseID.GetHashCode();
         }
     }
 }

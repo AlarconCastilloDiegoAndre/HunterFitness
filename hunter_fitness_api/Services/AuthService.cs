@@ -38,7 +38,7 @@ namespace HunterFitness.API.Services
             
             // Configuración JWT desde environment variables
             _jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? 
-                        "HunterFitness_SuperSecretKey_2025_ShadowMonarch_JinWoo";
+                        "HunterFitness_SuperSecretKey_2025_ShadowMonarch_JinWoo_ThisIsAVeryLongSecretKeyForJWT_Authentication_Purposes";
             _jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "HunterFitnessAPI";
             _jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "HunterFitnessApp";
             _jwtExpireHours = int.Parse(Environment.GetEnvironmentVariable("JWT_EXPIRE_HOURS") ?? "168"); // 1 semana
@@ -245,7 +245,6 @@ namespace HunterFitness.API.Services
             }
         }
 
-        // CORREGIDO: Removido async/await innecesario - ahora es método síncrono
         public Task<bool> ValidateTokenAsync(string token)
         {
             try

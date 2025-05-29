@@ -254,63 +254,15 @@ namespace HunterFitness.API.Models
             return effects;
         }
 
-        public Dictionary<string, object> GetEquipmentSummary()
-        {
-            return new Dictionary<string, object>
-            {
-                {"Name", ItemName},
-                {"Type", ItemType},
-                {"Rarity", Rarity},
-                {"PowerLevel", GetPowerLevel()},
-                {"StatBonus", GetTotalStatBonus()},
-                {"XPMultiplier", XPMultiplier},
-                {"UnlockLevel", UnlockLevel},
-                {"UnlockRank", UnlockRank},
-                {"Requirements", GetUnlockRequirementText()},
-                {"Effects", GetSpecialEffects()}
-            };
-        }
-
-        // Métodos adicionales para análisis y estadísticas
-        public bool IsWeapon()
-        {
-            return ItemType == "Weapon";
-        }
-
-        public bool IsArmor()
-        {
-            return ItemType == "Armor";
-        }
-
-        public bool IsAccessory()
-        {
-            return ItemType == "Accessory";
-        }
-
-        public bool IsCommon()
-        {
-            return Rarity == "Common";
-        }
-
-        public bool IsRare()
-        {
-            return Rarity == "Rare";
-        }
-
-        public bool IsEpic()
-        {
-            return Rarity == "Epic";
-        }
-
-        public bool IsLegendary()
-        {
-            return Rarity == "Legendary";
-        }
-
-        public bool IsMythic()
-        {
-            return Rarity == "Mythic";
-        }
+        // Métodos adicionales para análisis
+        public bool IsWeapon() => ItemType == "Weapon";
+        public bool IsArmor() => ItemType == "Armor";
+        public bool IsAccessory() => ItemType == "Accessory";
+        public bool IsCommon() => Rarity == "Common";
+        public bool IsRare() => Rarity == "Rare";
+        public bool IsEpic() => Rarity == "Epic";
+        public bool IsLegendary() => Rarity == "Legendary";
+        public bool IsMythic() => Rarity == "Mythic";
 
         public string GetDominantStat()
         {
@@ -324,54 +276,6 @@ namespace HunterFitness.API.Models
 
             var maxStat = stats.OrderByDescending(s => s.Value).FirstOrDefault();
             return maxStat.Value > 0 ? maxStat.Key : "Balanced";
-        }
-
-        public string GetEquipmentClass()
-        {
-            var totalStats = GetTotalStatBonus();
-            var xpBonus = XPMultiplier - 1.0m;
-
-            if (xpBonus > 0.5m)
-                return "XP Booster";
-            else if (totalStats >= 15)
-                return "Combat Focused";
-            else if (totalStats >= 5)
-                return "Stat Enhancer";
-            else
-                return "Basic Equipment";
-        }
-
-        public int GetRequiredHunterRankValue()
-        {
-            var rankOrder = new Dictionary<string, int>
-            {
-                {"E", 1}, {"D", 2}, {"C", 3}, {"B", 4}, 
-                {"A", 5}, {"S", 6}, {"SS", 7}, {"SSS", 8}
-            };
-
-            return rankOrder.TryGetValue(UnlockRank, out var value) ? value : 1;
-        }
-
-        public string GetDetailedDescription()
-        {
-            var parts = new List<string>();
-
-            if (!string.IsNullOrWhiteSpace(Description))
-                parts.Add(Description);
-            else
-                parts.Add($"A {Rarity.ToLower()} {ItemType.ToLower()} for hunters.");
-
-            parts.Add($"Power Level: {GetPowerLevel()}");
-            
-            var statBonus = GetStatBonusDescription();
-            if (statBonus != "No bonuses")
-                parts.Add($"Bonuses: {statBonus}");
-
-            var requirements = GetUnlockRequirementText();
-            if (requirements != "No requirements")
-                parts.Add($"Requirements: {requirements}");
-
-            return string.Join(" | ", parts);
         }
 
         // Validaciones

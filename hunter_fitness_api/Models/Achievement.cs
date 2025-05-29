@@ -199,75 +199,22 @@ namespace HunterFitness.API.Models
         }
 
         // Métodos adicionales para análisis
-        public bool IsConsistencyAchievement()
-        {
-            return Category == "Consistency";
-        }
+        public bool IsConsistencyAchievement() => Category == "Consistency";
+        public bool IsStrengthAchievement() => Category == "Strength";
+        public bool IsEnduranceAchievement() => Category == "Endurance";
+        public bool IsSocialAchievement() => Category == "Social";
+        public bool IsSpecialAchievement() => Category == "Special";
+        public bool IsMilestoneAchievement() => Category == "Milestone";
 
-        public bool IsStrengthAchievement()
-        {
-            return Category == "Strength";
-        }
+        public bool IsCounterType() => AchievementType == "Counter";
+        public bool IsStreakType() => AchievementType == "Streak";
+        public bool IsSingleType() => AchievementType == "Single";
+        public bool IsProgressiveType() => AchievementType == "Progressive";
 
-        public bool IsEnduranceAchievement()
-        {
-            return Category == "Endurance";
-        }
-
-        public bool IsSocialAchievement()
-        {
-            return Category == "Social";
-        }
-
-        public bool IsSpecialAchievement()
-        {
-            return Category == "Special";
-        }
-
-        public bool IsMilestoneAchievement()
-        {
-            return Category == "Milestone";
-        }
-
-        public bool IsCounterType()
-        {
-            return AchievementType == "Counter";
-        }
-
-        public bool IsStreakType()
-        {
-            return AchievementType == "Streak";
-        }
-
-        public bool IsSingleType()
-        {
-            return AchievementType == "Single";
-        }
-
-        public bool IsProgressiveType()
-        {
-            return AchievementType == "Progressive";
-        }
-
-        public bool HasTitleReward()
-        {
-            return !string.IsNullOrWhiteSpace(TitleReward);
-        }
-
-        public bool IsHighValue()
-        {
-            return XPReward >= 1000 || GetDifficultyLevel() is "Master" or "Legendary";
-        }
-
-        public bool IsEasyToComplete()
-        {
-            return GetDifficultyLevel() is "Novice" or "Apprentice";
-        }
-
-        public bool IsChallengingToComplete()
-        {
-            return GetDifficultyLevel() is "Expert" or "Master" or "Legendary";
-        }
+        public bool HasTitleReward() => !string.IsNullOrWhiteSpace(TitleReward);
+        public bool IsHighValue() => XPReward >= 1000 || GetDifficultyLevel() is "Master" or "Legendary";
+        public bool IsEasyToComplete() => GetDifficultyLevel() is "Novice" or "Apprentice";
+        public bool IsChallengingToComplete() => GetDifficultyLevel() is "Expert" or "Master" or "Legendary";
 
         public string GetCategoryIcon()
         {

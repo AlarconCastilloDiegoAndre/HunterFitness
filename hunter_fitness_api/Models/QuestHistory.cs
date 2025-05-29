@@ -205,8 +205,154 @@ namespace HunterFitness.API.Models
                 {"CompletionTime", GetCompletionTimeFormatted()},
                 {"Stats", GetStatsDescription()},
                 {"PerfectExecution", PerfectExecution},
-                {"BonusMultiplier", BonusMultiplier}
+                {"BonusMultiplier", BonusMultiplier},
+                {"WasFaster", WasFasterThanEstimated()},
+                {"SpeedBonus", GetSpeedBonus()}
             };
+        }
+
+        public string GetAchievementLevel()
+        {
+            return GetPerformanceRating() switch
+            {
+                "Legendary" => "🏆 Legendary Performance",
+                "Perfect" => "👑 Perfect Execution",
+                "Excellent" => "⭐ Excellent Work",
+                "Good" => "💪 Good Job",
+                "Completed" => "✅ Completed",
+                _ => "✅ Completed"
+            };
+        }
+
+        public bool ExceededExpectations()
+        {
+            return PerfectExecution || BonusMultiplier > 1.2m || WasFasterThanEstimated();
+        }
+
+        public string GetMotivationalMessage()
+        {
+            if (ExceededExpectations())
+            {
+                var messages = new[]
+                {
+                    "Outstanding work! You're becoming unstoppable! 🔥",
+                    "Incredible performance! The Shadow Monarch would be proud! 👑",
+                    "Perfect execution! Your dedication is paying off! ⭐",
+                    "Amazing results! You're leveling up in real life! 💪"
+                };
+                return messages[new Random().Next(messages.Length)];
+            }
+            else
+            {
+                var messages = new[]
+                {
+                    "Great job completing this quest! Every step counts! 🌟",
+                    "Well done! You're building strength and consistency! 💪",
+                    "Nice work! Your fitness journey continues! 🏹",
+                    "Quest completed! You're making progress every day! 📈"
+                };
+                return messages[new Random().Next(messages.Length)];
+            }
+        }
+
+        public int GetDifficultyPoints()
+        {
+            if (Quest == null) return 0;
+
+            return Quest.Difficulty switch
+            {
+                "Easy" => 1,
+                "Medium" => 2,
+                "Hard" => 3,
+                "Extreme" => 5,
+                _ => 1
+            };
+        }
+
+        public decimal GetEfficiencyScore()
+        {
+            if (!CompletionTime.HasValue || Quest == null) return 1.0m;
+
+            var estimatedTime = Quest.GetEstimatedTimeMinutes() * 60;
+            if (estimatedTime <= 0) return 1.0m;
+
+            var efficiency = (decimal)estimatedTime / CompletionTime.Value;
+            return Math.Max(0.1m, Math.Min(3.0m, efficiency)); // Entre 0.1x y 3.0x eficiencia
+        }
+
+        public bool IsHighPerformance()
+        {
+            return GetPerformanceRating() is "Excellent" or "Perfect" or "Legendary";
+        }
+
+        public string GetComparisonToPrevious(QuestHistory? previousCompletion)
+        {
+            if (previousCompletion == null || !CompletionTime.HasValue || !previousCompletion.CompletionTime.HasValue)
+                return "First completion";
+
+            var timeDiff = CompletionTime.Value - previousCompletion.CompletionTime.Value;
+            var xpDiff = XPEarned - previousCompletion.XPEarned;
+
+            if (timeDiff < 0 && xpDiff >= 0)
+                return $"🔥 Improved! {Math.Abs(timeDiff)}s faster, +{xpDiff} XP";
+            else if (timeDiff < 0)
+                return $"⚡ {Math.Abs(timeDiff)}s faster";
+            else if (xpDiff > 0)
+                return $"📈 +{xpDiff} more XP earned";
+            else
+                return "Similar performance";
+        }
+
+        // Validaciones
+        public List<string> ValidateData()
+        {
+            var errors = new List<string>();
+
+            if (XPEarned < 0)
+                errors.Add("XP earned cannot be negative");
+
+            if (CompletionTime.HasValue && CompletionTime <= 0)
+                errors.Add("Completion time must be positive");
+
+            if (BonusMultiplier < 0.5m || BonusMultiplier > 5.0m)
+                errors.Add("Bonus multiplier must be between 0.5 and 5.0");
+
+            if (FinalReps.HasValue && FinalReps < 0)
+                errors.Add("Final reps cannot be negative");
+
+            if (FinalSets.HasValue && FinalSets < 0)
+                errors.Add("Final sets cannot be negative");
+
+            if (FinalDuration.HasValue && FinalDuration < 0)
+                errors.Add("Final duration cannot be negative");
+
+            if (FinalDistance.HasValue && FinalDistance < 0)
+                errors.Add("Final distance cannot be negative");
+
+            if (CompletedAt > DateTime.UtcNow)
+                errors.Add("Completion date cannot be in the future");
+
+            return errors;
+        }
+
+        // Override para mejor debugging
+        public override string ToString()
+        {
+            return $"{Quest?.QuestName ?? "Unknown"} - {GetPerformanceRating()} ({XPEarned} XP)";
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is QuestHistory other)
+            {
+                return HistoryID == other.HistoryID;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return HistoryID.GetHashCode();
         }
     }
 }

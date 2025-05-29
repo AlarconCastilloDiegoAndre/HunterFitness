@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using hunter_fitness_api.Models;
+using HunterFitness.API.Models;
 
 namespace HunterFitness.API.Data
 {
@@ -38,7 +38,7 @@ namespace HunterFitness.API.Data
             // Configuración de relaciones
             modelBuilder.Entity<HunterDailyQuest>()
                 .HasOne<Hunter>()
-                .WithMany(h => h.HunterDailyQuests)
+                .WithMany(h => h.DailyQuests)
                 .HasForeignKey(hdq => hdq.HunterID);
 
             modelBuilder.Entity<HunterAchievement>()
@@ -48,6 +48,43 @@ namespace HunterFitness.API.Data
             modelBuilder.Entity<HunterEquipment>()
                 .HasIndex(he => new { he.HunterID, he.EquipmentID })
                 .IsUnique();
+
+            // Configurar precision para decimales
+            modelBuilder.Entity<HunterDailyQuest>()
+                .Property(h => h.Progress)
+                .HasPrecision(5, 2);
+
+            modelBuilder.Entity<HunterDailyQuest>()
+                .Property(h => h.BonusMultiplier)
+                .HasPrecision(3, 2);
+
+            modelBuilder.Entity<HunterDailyQuest>()
+                .Property(h => h.CurrentDistance)
+                .HasPrecision(10, 2);
+
+            modelBuilder.Entity<DungeonRaid>()
+                .Property(d => d.Progress)
+                .HasPrecision(5, 2);
+
+            modelBuilder.Entity<DungeonRaid>()
+                .Property(d => d.CompletionRate)
+                .HasPrecision(5, 2);
+
+            modelBuilder.Entity<Equipment>()
+                .Property(e => e.XPMultiplier)
+                .HasPrecision(3, 2);
+
+            modelBuilder.Entity<QuestHistory>()
+                .Property(q => q.BonusMultiplier)
+                .HasPrecision(3, 2);
+
+            modelBuilder.Entity<QuestHistory>()
+                .Property(q => q.FinalDistance)
+                .HasPrecision(10, 2);
+
+            modelBuilder.Entity<DailyQuest>()
+                .Property(d => d.TargetDistance)
+                .HasPrecision(10, 2);
         }
     }
 }

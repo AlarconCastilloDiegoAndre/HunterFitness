@@ -215,5 +215,73 @@ namespace HunterFitness.API.Models
             return IsNewlyUnlocked(48) || // Brilla si es nuevo (48 horas)
                    (Equipment?.Rarity == "Legendary" || Equipment?.Rarity == "Mythic"); // Brilla si es legendario o mítico
         }
+
+        public string GetTimeOwnedDescription()
+        {
+            var timeOwned = GetTimeOwned();
+            
+            if (timeOwned.TotalDays >= 1)
+                return $"{(int)timeOwned.TotalDays} days ago";
+            else if (timeOwned.TotalHours >= 1)
+                return $"{(int)timeOwned.TotalHours} hours ago";
+            else if (timeOwned.TotalMinutes >= 1)
+                return $"{(int)timeOwned.TotalMinutes} minutes ago";
+            else
+                return "Just unlocked";
+        }
+
+        public Dictionary<string, object> GetEquipmentSummary()
+        {
+            return new Dictionary<string, object>
+            {
+                {"ItemName", Equipment?.ItemName ?? "Unknown"},
+                {"ItemType", Equipment?.ItemType ?? "Unknown"},
+                {"Rarity", Equipment?.Rarity ?? "Unknown"},
+                {"IsEquipped", IsEquipped},
+                {"PowerScore", GetPowerScore()},
+                {"StatBonuses", GetStatBonusDescription()},
+                {"TimeOwned", GetTimeOwnedDescription()},
+                {"CanBeEquipped", CanBeEquipped()},
+                {"Status", GetEquipmentStatusText()}
+            };
+        }
+
+        // Métodos de validación
+        public List<string> ValidateEquipmentState()
+        {
+            var errors = new List<string>();
+
+            if (Equipment == null)
+                errors.Add("Equipment reference is missing");
+
+            if (Hunter == null)
+                errors.Add("Hunter reference is missing");
+
+            if (IsEquipped && !CanBeEquipped())
+                errors.Add("Item is equipped but requirements are not met");
+
+            return errors;
+        }
+
+        // Override para mejor debugging
+        public override string ToString()
+        {
+            var status = IsEquipped ? "Equipped" : "Unequipped";
+            return $"{Equipment?.ItemName ?? "Unknown"} ({status}) - Power: {GetPowerScore()}";
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is HunterEquipment other)
+            {
+                return HunterEquipmentID == other.HunterEquipmentID;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return HunterEquipmentID.GetHashCode();
+        }
     }
 }
