@@ -29,10 +29,10 @@ class ApiService {
     }
   }
   
-  // Login con debug completo
+  // Login - URL CORREGIDA FINAL
   Future<Map<String, dynamic>> login(String username, String password) async {
     try {
-      final url = '$baseUrl/auth/login';
+      final url = '$baseUrl/LoginHunter';  // ← ENDPOINT CORRECTO
       final requestBody = {
         'username': username,
         'password': password,
@@ -60,10 +60,15 @@ class ApiService {
         final responseData = json.decode(response.body);
         print('✅ Login successful: $responseData');
         
-        if (responseData['success'] == true) {
-          return responseData;
+        // Tu API usa "Success" con mayúscula
+        if (responseData['Success'] == true) {
+          return {
+            'success': true,
+            'message': responseData['Message'],
+            'data': responseData['Data'],
+          };
         } else {
-          throw Exception(responseData['message'] ?? 'Login failed - success is false');
+          throw Exception(responseData['Message'] ?? 'Login failed - Success is false');
         }
       } else {
         print('❌ Login failed with status: ${response.statusCode}');
@@ -75,10 +80,10 @@ class ApiService {
     }
   }
   
-  // Register con debug
+  // Register - URL CORREGIDA FINAL
   Future<Map<String, dynamic>> register(String username, String email, String password, String hunterName) async {
     try {
-      final url = '$baseUrl/auth/register';
+      final url = '$baseUrl/RegisterHunter';  // ← ENDPOINT CORRECTO
       final requestBody = {
         'username': username,
         'email': email,
@@ -102,10 +107,15 @@ class ApiService {
       
       if (response.statusCode == 200 || response.statusCode == 201) {
         final responseData = json.decode(response.body);
-        if (responseData['success'] == true) {
-          return responseData;
+        // Tu API usa "Success" con mayúscula
+        if (responseData['Success'] == true) {
+          return {
+            'success': true,
+            'message': responseData['Message'],
+            'data': responseData['Data'],
+          };
         } else {
-          throw Exception(responseData['message'] ?? 'Registration failed');
+          throw Exception(responseData['Message'] ?? 'Registration failed');
         }
       } else {
         throw Exception('Registration failed: ${response.statusCode} - ${response.body}');
@@ -116,20 +126,20 @@ class ApiService {
     }
   }
   
-  // Get Hunter Profile
+  // Get Hunter Profile - URL CORREGIDA
   Future<Map<String, dynamic>> getHunterProfile(String hunterId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/hunters/profile?hunterId=$hunterId'),
+        Uri.parse('$baseUrl/GetHunterProfile?hunterId=$hunterId'),  // ← Basado en tu lista
         headers: headers,
       ).timeout(const Duration(seconds: 10));
       
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        if (responseData['success'] == true) {
-          return responseData['data'];
+        if (responseData['Success'] == true) {
+          return responseData['Data'];
         } else {
-          throw Exception(responseData['message'] ?? 'Failed to get profile');
+          throw Exception(responseData['Message'] ?? 'Failed to get profile');
         }
       } else {
         throw Exception('Failed to get profile: ${response.statusCode}');

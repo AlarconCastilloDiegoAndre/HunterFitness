@@ -94,7 +94,7 @@ namespace HunterFitness.API.Functions
 
         [Function("LoginHunter")]
         public async Task<HttpResponseData> Login(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "auth/login")] 
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post")] 
             HttpRequestData req)
         {
             _logger.LogInformation("🔐 Hunter login attempt");
