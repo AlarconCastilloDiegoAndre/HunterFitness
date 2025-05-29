@@ -88,7 +88,7 @@ namespace HunterFitness.API.Services
                 var token = GenerateJwtToken(hunter);
 
                 // Convertir a DTO
-                var hunterProfile = await ConvertToHunterProfileDto(hunter);
+                var hunterProfile = await ConvertToHunterProfileDtoAsync(hunter);
 
                 return new AuthResponseDto
                 {
@@ -155,7 +155,7 @@ namespace HunterFitness.API.Services
                 var token = GenerateJwtToken(hunter);
 
                 // Convertir a DTO
-                var hunterProfile = await ConvertToHunterProfileDto(hunter);
+                var hunterProfile = await ConvertToHunterProfileDtoAsync(hunter);
 
                 return new AuthResponseDto
                 {
@@ -224,7 +224,7 @@ namespace HunterFitness.API.Services
 
                 // Generar nuevo token
                 var newToken = GenerateJwtToken(hunter);
-                var hunterProfile = await ConvertToHunterProfileDto(hunter);
+                var hunterProfile = await ConvertToHunterProfileDtoAsync(hunter);
 
                 return new AuthResponseDto
                 {
@@ -312,7 +312,7 @@ namespace HunterFitness.API.Services
             }
         }
 
-        private async Task<HunterProfileDto> ConvertToHunterProfileDto(Hunter hunter)
+        private async Task<HunterProfileDto> ConvertToHunterProfileDtoAsync(Hunter hunter)
         {
             // Recargar hunter con equipment si no está incluido
             if (hunter.Equipment?.Any() != true)

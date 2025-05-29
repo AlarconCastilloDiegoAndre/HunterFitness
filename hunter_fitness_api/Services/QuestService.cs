@@ -46,6 +46,7 @@ namespace HunterFitness.API.Services
                 // Obtener quests del día
                 var hunterQuests = await _context.HunterDailyQuests
                     .Include(hq => hq.Quest)
+                    .Include(hq => hq.Hunter)
                     .Where(hq => hq.HunterID == hunterId && hq.QuestDate == targetDate)
                     .OrderBy(hq => hq.AssignedAt)
                     .ToListAsync();
@@ -56,6 +57,7 @@ namespace HunterFitness.API.Services
                     await GenerateDailyQuestsAsync(hunterId, targetDate);
                     hunterQuests = await _context.HunterDailyQuests
                         .Include(hq => hq.Quest)
+                        .Include(hq => hq.Hunter)
                         .Where(hq => hq.HunterID == hunterId && hq.QuestDate == targetDate)
                         .OrderBy(hq => hq.AssignedAt)
                         .ToListAsync();

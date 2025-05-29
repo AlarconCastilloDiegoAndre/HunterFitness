@@ -1,7 +1,6 @@
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.ApplicationInsights.WorkerService;
 using Microsoft.EntityFrameworkCore;

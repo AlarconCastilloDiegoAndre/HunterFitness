@@ -172,26 +172,33 @@ namespace HunterFitness.API.Services
                     .ThenByDescending(h => h.Level)
                     .ThenByDescending(h => h.LongestStreak)
                     .Take(limit)
-                    .Select((h, index) => new LeaderboardEntryDto
-                    {
-                        Rank = index + 1,
-                        HunterID = h.HunterID,
-                        Username = h.Username,
-                        HunterName = h.HunterName,
-                        Level = h.Level,
-                        TotalXP = h.TotalXP,
-                        HunterRank = h.HunterRank,
-                        RankDisplayName = h.GetRankDisplayName(),
-                        DailyStreak = h.DailyStreak,
-                        LongestStreak = h.LongestStreak,
-                        TotalWorkouts = h.TotalWorkouts,
-                        ProfilePictureUrl = h.ProfilePictureUrl,
-                        IsCurrentUser = currentHunterId.HasValue && h.HunterID == currentHunterId.Value,
-                        RankChange = "=" // TODO: Implementar cambio de ranking
-                    })
                     .ToListAsync();
 
-                return hunters;
+                var leaderboard = new List<LeaderboardEntryDto>();
+                
+                for (int i = 0; i < hunters.Count; i++)
+                {
+                    var hunter = hunters[i];
+                    leaderboard.Add(new LeaderboardEntryDto
+                    {
+                        Rank = i + 1,
+                        HunterID = hunter.HunterID,
+                        Username = hunter.Username,
+                        HunterName = hunter.HunterName,
+                        Level = hunter.Level,
+                        TotalXP = hunter.TotalXP,
+                        HunterRank = hunter.HunterRank,
+                        RankDisplayName = hunter.GetRankDisplayName(),
+                        DailyStreak = hunter.DailyStreak,
+                        LongestStreak = hunter.LongestStreak,
+                        TotalWorkouts = hunter.TotalWorkouts,
+                        ProfilePictureUrl = hunter.ProfilePictureUrl,
+                        IsCurrentUser = currentHunterId.HasValue && hunter.HunterID == currentHunterId.Value,
+                        RankChange = "=" // TODO: Implementar cambio de ranking
+                    });
+                }
+
+                return leaderboard;
             }
             catch (Exception ex)
             {

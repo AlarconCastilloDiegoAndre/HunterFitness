@@ -19,8 +19,8 @@ namespace HunterFitness.API.Data
         public DbSet<Achievement> Achievements { get; set; }
         public DbSet<HunterAchievement> HunterAchievements { get; set; }
         public DbSet<Equipment> Equipment { get; set; }
-        public DbSet<HunterEquipment> HunterEquipments { get; set; }
-        public DbSet<QuestHistory> QuestHistories { get; set; }
+        public DbSet<HunterEquipment> HunterEquipment { get; set; } // Corregido: nombre singular
+        public DbSet<QuestHistory> QuestHistory { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -37,17 +37,78 @@ namespace HunterFitness.API.Data
 
             // Configuración de relaciones
             modelBuilder.Entity<HunterDailyQuest>()
-                .HasOne<Hunter>()
+                .HasOne(hdq => hdq.Hunter)
                 .WithMany(h => h.DailyQuests)
-                .HasForeignKey(hdq => hdq.HunterID);
+                .HasForeignKey(hdq => hdq.HunterID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<HunterDailyQuest>()
+                .HasOne(hdq => hdq.Quest)
+                .WithMany(q => q.HunterDailyQuests)
+                .HasForeignKey(hdq => hdq.QuestID)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<HunterAchievement>()
                 .HasIndex(ha => new { ha.HunterID, ha.AchievementID })
                 .IsUnique();
 
+            modelBuilder.Entity<HunterAchievement>()
+                .HasOne(ha => ha.Hunter)
+                .WithMany(h => h.Achievements)
+                .HasForeignKey(ha => ha.HunterID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<HunterAchievement>()
+                .HasOne(ha => ha.Achievement)
+                .WithMany(a => a.HunterAchievements)
+                .HasForeignKey(ha => ha.AchievementID)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<HunterEquipment>()
                 .HasIndex(he => new { he.HunterID, he.EquipmentID })
                 .IsUnique();
+
+            modelBuilder.Entity<HunterEquipment>()
+                .HasOne(he => he.Hunter)
+                .WithMany(h => h.Equipment)
+                .HasForeignKey(he => he.HunterID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<HunterEquipment>()
+                .HasOne(he => he.Equipment)
+                .WithMany(e => e.HunterEquipment)
+                .HasForeignKey(he => he.EquipmentID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DungeonRaid>()
+                .HasOne(dr => dr.Hunter)
+                .WithMany(h => h.DungeonRaids)
+                .HasForeignKey(dr => dr.HunterID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<DungeonRaid>()
+                .HasOne(dr => dr.Dungeon)
+                .WithMany(d => d.Raids)
+                .HasForeignKey(dr => dr.DungeonID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DungeonExercise>()
+                .HasOne(de => de.Dungeon)
+                .WithMany(d => d.Exercises)
+                .HasForeignKey(de => de.DungeonID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<QuestHistory>()
+                .HasOne(qh => qh.Hunter)
+                .WithMany(h => h.QuestHistory)
+                .HasForeignKey(qh => qh.HunterID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<QuestHistory>()
+                .HasOne(qh => qh.Quest)
+                .WithMany(q => q.QuestHistory)
+                .HasForeignKey(qh => qh.QuestID)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Configurar precision para decimales
             modelBuilder.Entity<HunterDailyQuest>()
@@ -85,6 +146,24 @@ namespace HunterFitness.API.Data
             modelBuilder.Entity<DailyQuest>()
                 .Property(d => d.TargetDistance)
                 .HasPrecision(10, 2);
+
+            // Configuraciones de índices para rendimiento
+            modelBuilder.Entity<HunterDailyQuest>()
+                .HasIndex(hq => new { hq.HunterID, hq.QuestDate })
+                .HasDatabaseName("IX_HunterDailyQuests_HunterID_Date");
+
+            modelBuilder.Entity<DungeonRaid>()
+                .HasIndex(dr => dr.HunterID)
+                .HasDatabaseName("IX_DungeonRaids_HunterID");
+
+            modelBuilder.Entity<QuestHistory>()
+                .HasIndex(qh => new { qh.HunterID, qh.CompletedAt })
+                .HasDatabaseName("IX_QuestHistory_HunterID_CompletedAt");
+
+            // Configurar columnas de fecha
+            modelBuilder.Entity<HunterDailyQuest>()
+                .Property(hq => hq.QuestDate)
+                .HasColumnType("date");
         }
     }
 }

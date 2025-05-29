@@ -80,7 +80,7 @@ namespace HunterFitness.API.Models
                 Progress = 100.00m;
 
                 // Calcular XP ganado
-                if (Quest != null)
+                if (Quest != null && Hunter != null)
                 {
                     XPEarned = (int)(Quest.GetScaledXPReward(Hunter) * BonusMultiplier);
                 }
@@ -196,6 +196,53 @@ namespace HunterFitness.API.Models
             }
 
             return Math.Min(bonus, 2.0m); // Máximo 200% del XP base
+        }
+
+        // Validaciones
+        public List<string> ValidateData()
+        {
+            var errors = new List<string>();
+
+            var validStatuses = new[] { "Assigned", "InProgress", "Completed", "Failed" };
+            if (!validStatuses.Contains(Status))
+                errors.Add("Invalid status");
+
+            if (Progress < 0 || Progress > 100)
+                errors.Add("Progress must be between 0 and 100");
+
+            if (CurrentReps < 0 || CurrentSets < 0 || CurrentDuration < 0 || CurrentDistance < 0)
+                errors.Add("Progress values cannot be negative");
+
+            if (XPEarned < 0)
+                errors.Add("XP earned cannot be negative");
+
+            if (BonusMultiplier < 0.5m || BonusMultiplier > 5.0m)
+                errors.Add("Bonus multiplier must be between 0.5 and 5.0");
+
+            if (CompletedAt.HasValue && StartedAt.HasValue && CompletedAt < StartedAt)
+                errors.Add("Completion time cannot be before start time");
+
+            return errors;
+        }
+
+        // Override para debugging
+        public override string ToString()
+        {
+            return $"{Quest?.QuestName ?? "Unknown Quest"} - {Status} ({Progress:F1}%)";
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is HunterDailyQuest other)
+            {
+                return AssignmentID == other.AssignmentID;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return AssignmentID.GetHashCode();
         }
     }
 }
