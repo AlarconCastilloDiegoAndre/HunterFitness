@@ -13,46 +13,46 @@ dependencies:
     sdk: flutter
   
   # HTTP requests
-  http: ^1.1.0
+  http: ^1.1.0 # Ya lo tienes
   
-  # JSON handling
-  json_annotation: ^4.8.1
+  # JSON handling (implícito con http, pero json_serializable es para modelos complejos)
+  # json_annotation: ^4.8.1 # Ya lo tienes, útil para modelos más robustos
   
   # Secure storage
-  flutter_secure_storage: ^9.0.0
+  flutter_secure_storage: ^9.0.0 # Ya lo tienes
   
-  # State management
-  provider: ^6.1.1
+  # State management (Provider es una opción, pero para algo simple setState es suficiente)
+  # provider: ^6.1.1 # Ya lo tienes
   
   # UI components
-  cupertino_icons: ^1.0.2
+  cupertino_icons: ^1.0.2 # Ya lo tienes
   
-  # Loading indicators
-  flutter_spinkit: ^5.2.0
+  # Loading indicators (opcional para un login simple)
+  # flutter_spinkit: ^5.2.0
   
-  # Toast messages
-  fluttertoast: ^8.2.4
+  # Toast messages (opcional para un login simple)
+  # fluttertoast: ^8.2.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   
-  flutter_lints: ^3.0.0
-  json_serializable: ^6.7.1
-  build_runner: ^2.4.7
+  flutter_lints: ^3.0.0 # Ya lo tienes
+  # json_serializable: ^6.7.1 # Ya lo tienes
+  # build_runner: ^2.4.7 # Ya lo tienes
 
 flutter:
   uses-material-design: true
   
-  # Assets
-  assets:
-    - assets/images/
-    - assets/icons/
+  # Assets (si los tuvieras para la UI)
+  # assets:
+  #   - assets/images/
+  #   - assets/icons/
   
-  # Fonts
-  fonts:
-    - family: HunterFont
-      fonts:
-        - asset: assets/fonts/Roboto-Regular.ttf
-        - asset: assets/fonts/Roboto-Bold.ttf
-          weight: 700
+  # Fonts (si los tuvieras)
+  # fonts:
+  #   - family: HunterFont
+  #     fonts:
+  #       - asset: assets/fonts/Roboto-Regular.ttf
+  #       - asset: assets/fonts/Roboto-Bold.ttf
+  #         weight: 700
