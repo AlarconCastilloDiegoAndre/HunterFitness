@@ -32,7 +32,8 @@ class ApiService {
 
       final responseData = jsonDecode(response.body);
 
-      if (response.statusCode == 200 && responseData['success'] == true) { // Exitoso login desde API
+      // El login exitoso debería devolver 200 OK
+      if (response.statusCode == 200 && responseData['success'] == true) {
         final apiResponseData = responseData['data'];
         if (apiResponseData != null && apiResponseData['token'] != null) {
           String token = apiResponseData['token'];
@@ -40,54 +41,34 @@ class ApiService {
           print('ApiService: Login exitoso, token guardado.');
           return {
             'success': true,
-            'message': apiResponseData['message'] ?? 'Login successful!',
+            'message': apiResponseData['message'] ?? '¡Login Exitoso!',
             'token': token,
             'hunter': apiResponseData['hunter']
           };
         } else {
-           print('ApiService: Login exitoso pero token no encontrado o data es null.');
+           print('ApiService: Login exitoso pero token/data no encontrado o es null.');
           return {
-            'success': false,
-            'message': responseData['message'] ?? 'Login exitoso pero respuesta inesperada.'
+            'success': false, // Considerarlo fallo si no hay token
+            'message': responseData['message'] ?? 'Login exitoso pero respuesta inesperada del servidor.'
           };
         }
-      } else if (response.statusCode == 201 && responseData['success'] == true) { // Exitoso registro desde API (código 201 Created)
-        final apiResponseData = responseData['data'];
-         if (apiResponseData != null && apiResponseData['token'] != null) {
-          String token = apiResponseData['token'];
-          await _storage.write(key: 'jwt_token', value: token);
-          print('ApiService: Registro exitoso, token guardado.');
-          return {
-            'success': true,
-            'message': apiResponseData['message'] ?? 'Registration successful!',
-            'token': token,
-            'hunter': apiResponseData['hunter']
-          };
-        } else {
-          print('ApiService: Registro exitoso pero token no encontrado o data es null.');
-          return {
-            'success': false,
-            'message': responseData['message'] ?? 'Registro exitoso pero respuesta inesperada.'
-          };
-        }
-      }
-      else {
-        print('ApiService: Login/Registro fallido - StatusCode: ${response.statusCode}, Mensaje API: ${responseData['message']}');
+      } else {
+        // Otros códigos de estado (ej. 401, 400) o success == false
+        print('ApiService: Login fallido - StatusCode: ${response.statusCode}, Mensaje API: ${responseData['message']}');
         return {
           'success': false,
-          'message': responseData['message'] ?? 'Operación fallida con estado: ${response.statusCode}'
+          'message': responseData['message'] ?? 'Login fallido con estado: ${response.statusCode}'
         };
       }
     } catch (e) {
-      print('ApiService: Excepción en el método login/registro: ${e.toString()}');
+      print('ApiService: Excepción en el método login: ${e.toString()}');
       if (e is FormatException) {
-        print('ApiService: Ocurrió un FormatException. Revisa el "LOGIN API Response Body (RAW)" impreso arriba.');
+        print('ApiService: Ocurrió un FormatException en Login. Revisa el "LOGIN API Response Body (RAW)" impreso arriba.');
       }
       return {'success': false, 'message': 'Error conectando al servidor: ${e.toString()}'};
     }
   }
 
-  // NUEVO MÉTODO PARA REGISTRO
   Future<Map<String, dynamic>> registerUser({
     required String username,
     required String email,
@@ -121,36 +102,36 @@ class ApiService {
       
       final responseData = jsonDecode(response.body);
 
+      // El registro exitoso en tu API devuelve 201 Created (o 200 OK)
       if ((response.statusCode == 201 || response.statusCode == 200) && responseData['success'] == true) {
-        final apiResponseData = responseData['data']; // Los datos útiles están aquí
+        final apiResponseData = responseData['data']; 
+        
+        if (apiResponseData != null) { 
+          String successMessage = apiResponseData['message'] ?? responseData['message'] ?? '¡Registro Exitoso!';
+          String? token = apiResponseData['token']; // Puede ser null si la API no devuelve token al registrar
+          var hunterData = apiResponseData['hunter'];
 
-        if (apiResponseData != null && apiResponseData['token'] != null && apiResponseData['hunter'] != null) {
-          String token = apiResponseData['token'];
-          await _storage.write(key: 'jwt_token', value: token);
-          print('ApiService: Registro exitoso y token guardado.');
-          return {
-            'success': true,
-            // USA EL MENSAJE DE apiResponseData
-            'message': apiResponseData['message'] ?? '¡Registro Exitoso! Token y datos de cazador recibidos.',
-            'token': token,
-            'hunter': apiResponseData['hunter']
-          };
-        } else if (apiResponseData != null && apiResponseData['message'] != null) {
-           // Caso donde el registro es exitoso pero quizás no devuelve token (solo mensaje)
-           print('ApiService: Registro exitoso, pero sin token/hunter en la respuesta principal de data.');
-            return {
-              'success': true,
-              'message': apiResponseData['message'] // Usa el mensaje de 'data'
-            };
-        } else {
-           print('ApiService: Registro exitoso (201/200) pero la estructura de "data" es inesperada o faltan campos.');
+          if (token != null) {
+            await _storage.write(key: 'jwt_token', value: token);
+            print('ApiService: Registro exitoso y token guardado.');
+          } else {
+            print('ApiService: Registro exitoso pero no se encontró token en la sub-respuesta "data".');
+          }
            return {
-            'success': true, // El registro fue exitoso a nivel de API
+            'success': true,
+            'message': successMessage,
+            'token': token, // Será null si no se devuelve
+            'hunter': hunterData // Será null si no se devuelve
+          };
+        } else {
+           // Esto pasaría si responseData['data'] es null, pero responseData['success'] es true
+           print('ApiService: Registro exitoso (201/200) pero el objeto "data" en la respuesta es null o inesperado.');
+           return {
+            'success': true, 
             'message': responseData['message'] ?? 'Registro completado, pero respuesta con formato inesperado.'
           };
         }
       } else {
-         // Usa responseData['message'] si está disponible, sino el mensaje genérico
          print('ApiService: Registro fallido - StatusCode: ${response.statusCode}, Mensaje API: ${responseData['message']}');
         return {
           'success': false,
