@@ -1,17 +1,19 @@
 # Docs for the Azure Web Apps Deploy action: https://github.com/azure/functions-action
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 
-name: Build and deploy dotnet core project to Azure Function App - hunter-fitness-api
+name: 🏹 Build and deploy Hunter Fitness API to Azure Functions
 
 on:
   push:
     branches:
       - master
+      - main
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.' # set this to the path to your web app project, defaults to the repository root
-  DOTNET_VERSION: '8' # set this to the dotnet version to use
+  AZURE_FUNCTIONAPP_NAME: 'hunter-fitness-api'
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: './hunter_fitness_api'  # Ajustar según tu estructura
+  DOTNET_VERSION: '8.0.x'
 
 jobs:
   build-and-deploy:
@@ -21,33 +23,78 @@ jobs:
       contents: read #This is required for actions/checkout
 
     steps:
-      - name: 'Checkout GitHub Action'
+      - name: 🔄 Checkout GitHub Action
         uses: actions/checkout@v4
 
-      - name: Setup DotNet ${{ env.DOTNET_VERSION }} Environment
-        uses: actions/setup-dotnet@v1
+      - name: 🔧 Setup DotNet ${{ env.DOTNET_VERSION }} Environment
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: 'Resolve Project Dependencies Using Dotnet'
+      - name: 📁 List Directory Structure (Debug)
+        run: |
+          echo "=== Repository Structure ==="
+          find . -name "hunter_fitness_api.csproj" -type f
+          echo "=== All directories ==="
+          ls -la
+          echo "=== Looking for hunter_fitness_api ==="
+          ls -la hunter_fitness_api/ || echo "hunter_fitness_api directory not found"
+
+      - name: 📦 Restore Project Dependencies
         shell: bash
         run: |
-          pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet build --configuration Release --output ./output
+          # Buscar el archivo .csproj
+          PROJECT_FILE=$(find . -name "hunter_fitness_api.csproj" -type f | head -1)
+          if [ -z "$PROJECT_FILE" ]; then
+            echo "❌ No .csproj file found!"
+            exit 1
+          fi
+          echo "✅ Found project file: $PROJECT_FILE"
+          PROJECT_DIR=$(dirname "$PROJECT_FILE")
+          echo "📁 Project directory: $PROJECT_DIR"
+          
+          pushd "$PROJECT_DIR"
+          dotnet restore
           popd
-      
-      - name: Login to Azure
+
+      - name: 🏗️ Build Project
+        shell: bash
+        run: |
+          PROJECT_FILE=$(find . -name "hunter_fitness_api.csproj" -type f | head -1)
+          PROJECT_DIR=$(dirname "$PROJECT_FILE")
+          
+          pushd "$PROJECT_DIR"
+          dotnet build --configuration Release --no-restore
+          popd
+
+      - name: 📋 Publish Project
+        shell: bash
+        run: |
+          PROJECT_FILE=$(find . -name "hunter_fitness_api.csproj" -type f | head -1)
+          PROJECT_DIR=$(dirname "$PROJECT_FILE")
+          
+          pushd "$PROJECT_DIR"
+          dotnet publish --configuration Release --no-build --output ../publish
+          popd
+          
+          echo "=== Published Files ==="
+          ls -la publish/
+
+      - name: 🔐 Login to Azure
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_E5646C2C00794B93A71D81DC5F9E8D1F }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_F4990B344EB4421296FED1CE0B6E9620 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_7CF3D59C721944028A9DF8BCD01A6CF5 }}
 
-      - name: 'Run Azure Functions Action'
+      - name: 🚀 Deploy to Azure Functions
         uses: Azure/functions-action@v1
-        id: fa
         with:
-          app-name: 'hunter-fitness-api'
-          slot-name: 'Production'
-          package: '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
-          
+          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: './publish'
+
+      - name: ✅ Deployment Success
+        run: |
+          echo "🎉 Hunter Fitness API deployed successfully!"
+          echo "🌐 URL: https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net"
+          echo "🏥 Health Check: https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net/api/health"
