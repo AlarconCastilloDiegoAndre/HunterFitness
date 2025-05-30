@@ -34,7 +34,7 @@ jobs:
       - name: 📁 List Directory Structure (Debug)
         run: |
           echo "=== Repository Structure ==="
-          find . -name "*.csproj" -type f
+          find . -name "hunter_fitness_api.csproj" -type f
           echo "=== All directories ==="
           ls -la
           echo "=== Looking for hunter_fitness_api ==="
@@ -44,7 +44,7 @@ jobs:
         shell: bash
         run: |
           # Buscar el archivo .csproj
-          PROJECT_FILE=$(find . -name "*.csproj" -type f | head -1)
+          PROJECT_FILE=$(find . -name "hunter_fitness_api.csproj" -type f | head -1)
           if [ -z "$PROJECT_FILE" ]; then
             echo "❌ No .csproj file found!"
             exit 1
@@ -60,7 +60,7 @@ jobs:
       - name: 🏗️ Build Project
         shell: bash
         run: |
-          PROJECT_FILE=$(find . -name "*.csproj" -type f | head -1)
+          PROJECT_FILE=$(find . -name "hunter_fitness_api.csproj" -type f | head -1)
           PROJECT_DIR=$(dirname "$PROJECT_FILE")
           
           pushd "$PROJECT_DIR"
@@ -70,7 +70,7 @@ jobs:
       - name: 📋 Publish Project
         shell: bash
         run: |
-          PROJECT_FILE=$(find . -name "*.csproj" -type f | head -1)
+          PROJECT_FILE=$(find . -name "hunter_fitness_api.csproj" -type f | head -1)
           PROJECT_DIR=$(dirname "$PROJECT_FILE")
           
           pushd "$PROJECT_DIR"
