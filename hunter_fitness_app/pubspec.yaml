@@ -1,84 +1,58 @@
 name: hunter_fitness_app
-description: A gamified fitness app inspired by Solo Leveling where users become hunters and level up through workouts.
+description: Gamified fitness tracking app inspired by Solo Leveling
 publish_to: 'none'
+
 version: 1.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
   
-  # HTTP requests para conectar con la API de Azure
+  # HTTP requests
   http: ^1.1.0
   
-  # State management y navegación
-  provider: ^6.1.1
-  
-  # Local storage para datos offline y cache
-  shared_preferences: ^2.2.2
-  
-  # JSON handling y serialización
+  # JSON handling
   json_annotation: ^4.8.1
   
-  # Material Design icons adicionales
-  cupertino_icons: ^1.0.6
+  # Secure storage
+  flutter_secure_storage: ^9.0.0
   
-  # Para animaciones y efectos visuales (futuro)
-  # lottie: ^2.7.0
+  # State management
+  provider: ^6.1.1
   
-  # Para notificaciones push (futuro)
-  # firebase_messaging: ^14.7.9
+  # UI components
+  cupertino_icons: ^1.0.2
   
-  # Para almacenamiento de imágenes (futuro)
-  # image_picker: ^1.0.4
+  # Loading indicators
+  flutter_spinkit: ^5.2.0
+  
+  # Toast messages
+  fluttertoast: ^8.2.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   
-  # Linting y análisis de código
   flutter_lints: ^3.0.0
-  
-  # JSON code generation (futuro)
-  build_runner: ^2.4.7
   json_serializable: ^6.7.1
+  build_runner: ^2.4.7
 
 flutter:
   uses-material-design: true
   
-  # Assets para la app
+  # Assets
   assets:
     - assets/images/
-    - assets/animations/
-    - assets/sounds/
     - assets/icons/
-    
-  # Configuración de fuentes personalizadas (opcional)
-  # fonts:
-  #   - family: HunterFont
-  #     fonts:
-  #       - asset: assets/fonts/HunterFont-Regular.ttf
-  #       - asset: assets/fonts/HunterFont-Bold.ttf
-  #         weight: 700
-  #   - family: SoloLeveling
-  #     fonts:
-  #       - asset: assets/fonts/SoloLeveling-Regular.ttf
-  #       - asset: assets/fonts/SoloLeveling-Bold.ttf
-  #         weight: 700
-
-# Configuración adicional para desarrollo
-flutter_launcher_icons:
-  # Configuración de iconos de la app (futuro)
-  # android: "launcher_icon"
-  # ios: true
-  # image_path: "assets/icons/app_icon.png"
-
-# Configuración para splash screen (futuro)
-flutter_native_splash:
-  # color: "#0F0F23"
-  # image: assets/images/hunter_logo.png
-  # android_12:
-  #   image: assets/images/hunter_logo.png
-  #   color: "#0F0F23"
+  
+  # Fonts
+  fonts:
+    - family: HunterFont
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
