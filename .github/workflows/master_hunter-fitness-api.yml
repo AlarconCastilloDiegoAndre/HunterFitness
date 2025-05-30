@@ -7,13 +7,13 @@ on:
   push:
     branches:
       - master
-      - main  # Agregamos main también por si cambias
+      - main
   workflow_dispatch:
 
 env:
   AZURE_FUNCTIONAPP_NAME: 'hunter-fitness-api'
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: './hunter_fitness_api'  # Cambiar a tu carpeta correcta
-  DOTNET_VERSION: '8.0.x'  # Especificar versión completa
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: './hunter_fitness_api'  # Ajustar según tu estructura
+  DOTNET_VERSION: '8.0.x'
 
 jobs:
   build-and-deploy:
@@ -27,30 +27,58 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 🔧 Setup DotNet ${{ env.DOTNET_VERSION }} Environment
-        uses: actions/setup-dotnet@v4  # Actualizar a v4
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: 📁 List Directory Structure (Debug)
+        run: |
+          echo "=== Repository Structure ==="
+          find . -name "*.csproj" -type f
+          echo "=== All directories ==="
+          ls -la
+          echo "=== Looking for hunter_fitness_api ==="
+          ls -la hunter_fitness_api/ || echo "hunter_fitness_api directory not found"
 
       - name: 📦 Restore Project Dependencies
         shell: bash
         run: |
-          pushd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+          # Buscar el archivo .csproj
+          PROJECT_FILE=$(find . -name "*.csproj" -type f | head -1)
+          if [ -z "$PROJECT_FILE" ]; then
+            echo "❌ No .csproj file found!"
+            exit 1
+          fi
+          echo "✅ Found project file: $PROJECT_FILE"
+          PROJECT_DIR=$(dirname "$PROJECT_FILE")
+          echo "📁 Project directory: $PROJECT_DIR"
+          
+          pushd "$PROJECT_DIR"
           dotnet restore
           popd
 
       - name: 🏗️ Build Project
         shell: bash
         run: |
-          pushd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+          PROJECT_FILE=$(find . -name "*.csproj" -type f | head -1)
+          PROJECT_DIR=$(dirname "$PROJECT_FILE")
+          
+          pushd "$PROJECT_DIR"
           dotnet build --configuration Release --no-restore
           popd
 
       - name: 📋 Publish Project
         shell: bash
         run: |
-          pushd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet publish --configuration Release --no-build --output ../output
+          PROJECT_FILE=$(find . -name "*.csproj" -type f | head -1)
+          PROJECT_DIR=$(dirname "$PROJECT_FILE")
+          
+          pushd "$PROJECT_DIR"
+          dotnet publish --configuration Release --no-build --output ../publish
           popd
+          
+          echo "=== Published Files ==="
+          ls -la publish/
 
       - name: 🔐 Login to Azure
         uses: azure/login@v2
@@ -63,11 +91,10 @@ jobs:
         uses: Azure/functions-action@v1
         with:
           app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-          package: './output'
+          package: './publish'
 
       - name: ✅ Deployment Success
         run: |
           echo "🎉 Hunter Fitness API deployed successfully!"
           echo "🌐 URL: https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net"
           echo "🏥 Health Check: https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net/api/health"
-          echo "📊 Functions: https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net/api"
