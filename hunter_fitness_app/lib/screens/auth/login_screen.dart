@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:fluttertoast/fluttertoast.dart';
-import '../../services/auth_service.dart';
-import '../../utils/constants.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
-import '../../widgets/loading_overlay.dart';
+import '../../widgets/loading_widget.dart';
+import '../../utils/validators.dart';
+import '../../utils/constants.dart';
 import 'register_screen.dart';
+import '../home/dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,314 +16,425 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
-    with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   
   bool _obscurePassword = true;
   bool _rememberMe = false;
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+  
+  late AnimationController _logoAnimationController;
+  late AnimationController _formAnimationController;
+  late Animation<double> _logoScaleAnimation;
+  late Animation<double> _logoRotationAnimation;
+  late Animation<Offset> _formSlideAnimation;
+  late Animation<double> _formFadeAnimation;
 
   @override
   void initState() {
     super.initState();
     _setupAnimations();
-    _loadSavedCredentials();
+    _startAnimations();
   }
 
   void _setupAnimations() {
-    _animationController = AnimationController(
-      duration: AppConstants.longAnimation,
+    // Logo animations
+    _logoAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
-
-    _fadeAnimation = Tween<double>(
+    
+    _logoScaleAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
     ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
+      parent: _logoAnimationController,
+      curve: Curves.elasticOut,
+    ));
+    
+    _logoRotationAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _logoAnimationController,
+      curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
     ));
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.5),
+    // Form animations
+    _formAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    
+    _formSlideAnimation = Tween<Offset>(
+      begin: const Offset(0.0, 1.0),
       end: Offset.zero,
     ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutBack,
+      parent: _formAnimationController,
+      curve: Curves.easeOutCubic,
     ));
-
-    _animationController.forward();
+    
+    _formFadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _formAnimationController,
+      curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
+    ));
   }
 
-  Future<void> _loadSavedCredentials() async {
-    // TODO: Implement remember me functionality
-    // For now, just add some demo data for testing
-    if (mounted) {
-      _usernameController.text = 'testuser';
-      _passwordController.text = 'test123';
-    }
+  void _startAnimations() {
+    _logoAnimationController.forward();
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _formAnimationController.forward();
+    });
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    _logoAnimationController.dispose();
+    _formAnimationController.dispose();
     super.dispose();
   }
 
   Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
-    final authService = context.read<AuthService>();
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
-    final response = await authService.login(
+    final success = await authProvider.login(
       _usernameController.text.trim(),
       _passwordController.text,
     );
 
-    if (mounted) {
-      if (response.success) {
-        Fluttertoast.showToast(
-          msg: response.message,
-          toastLength: Toast.LENGTH_SHORT,
-          backgroundColor: AppColors.success,
-          textColor: AppColors.textPrimary,
-        );
-        
-        // Navigation is handled by AuthWrapper in main.dart
-      } else {
-        Fluttertoast.showToast(
-          msg: response.message,
-          toastLength: Toast.LENGTH_LONG,
-          backgroundColor: AppColors.error,
-          textColor: AppColors.textPrimary,
-        );
-      }
+    if (!mounted) return;
+
+    if (success) {
+      // Login exitoso - navegar al dashboard
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const DashboardScreen()),
+      );
+    } else {
+      // Mostrar error
+      _showErrorSnackBar(authProvider.errorMessage ?? 'Error de login');
     }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   void _navigateToRegister() {
     Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const RegisterScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          const begin = Offset(1.0, 0.0);
-          const end = Offset.zero;
-          const curve = Curves.ease;
-
-          var tween = Tween(begin: begin, end: end).chain(
-            CurveTween(curve: curve),
-          );
-
-          return SlideTransition(
-            position: animation.drive(tween),
-            child: child,
-          );
-        },
-      ),
+      MaterialPageRoute(builder: (context) => const RegisterScreen()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Consumer<AuthService>(
-        builder: (context, authService, child) {
-          return LoadingOverlay(
-            isLoading: authService.isLoading,
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: AppColors.darkGradient,
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Consumer<AuthProvider>(
+          builder: (context, authProvider, child) {
+            if (authProvider.isLoading) {
+              return const LoadingWidget(
+                message: 'Conectando con el Sistema Hunter...',
+              );
+            }
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                children: [
+                  const SizedBox(height: 60),
+                  
+                  // Logo y título animados
+                  _buildAnimatedLogo(),
+                  
+                  const SizedBox(height: 60),
+                  
+                  // Formulario animado
+                  _buildAnimatedForm(),
+                  
+                  const SizedBox(height: 40),
+                ],
               ),
-              child: SafeArea(
-                child: SingleChildScrollView(
-                  padding: AppConstants.screenPadding,
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SlideTransition(
-                      position: _slideAnimation,
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const SizedBox(height: 60),
-                            _buildHeader(),
-                            const SizedBox(height: 60),
-                            _buildLoginForm(),
-                            const SizedBox(height: 30),
-                            _buildLoginButton(),
-                            const SizedBox(height: 20),
-                            _buildRememberMeRow(),
-                            const SizedBox(height: 40),
-                            _buildRegisterPrompt(),
-                            const SizedBox(height: 20),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Column(
-      children: [
-        Container(
-          width: 120,
-          height: 120,
+  Widget _buildAnimatedLogo() {
+    return AnimatedBuilder(
+      animation: _logoAnimationController,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _logoScaleAnimation.value,
+          child: Transform.rotate(
+            angle: _logoRotationAnimation.value * 0.5,
+            child: Column(
+              children: [
+                // Logo principal
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.primaryGold, AppColors.primaryBlue],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryBlue.withOpacity(0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.fitness_center,
+                    size: 60,
+                    color: Colors.white,
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Título
+                const Text(
+                  AppStrings.appName,
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                
+                const SizedBox(height: 8),
+                
+                // Subtítulo
+                Text(
+                  'Iniciar Sesión Hunter',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAnimatedForm() {
+    return SlideTransition(
+      position: _formSlideAnimation,
+      child: FadeTransition(
+        opacity: _formFadeAnimation,
+        child: Container(
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: AppColors.primaryGold,
-            borderRadius: BorderRadius.circular(60),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primaryGold.withOpacity(0.3),
+                color: Colors.black.withOpacity(0.1),
                 blurRadius: 20,
-                spreadRadius: 5,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-          child: const Icon(
-            Icons.fitness_center,
-            size: 60,
-            color: AppColors.darkBackground,
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          AppStrings.appTitle,
-          style: Theme.of(context).textTheme.displayMedium?.copyWith(
-            color: AppColors.primaryGold,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          AppStrings.appSubtitle,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLoginForm() {
-    return Column(
-      children: [
-        CustomTextField(
-          controller: _usernameController,
-          label: AppStrings.username,
-          hint: 'Enter your username or email',
-          prefixIcon: Icons.person_outline,
-          validator: AuthService.validateUsername,
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 16),
-        CustomTextField(
-          controller: _passwordController,
-          label: AppStrings.password,
-          hint: 'Enter your password',
-          prefixIcon: Icons.lock_outline,
-          obscureText: _obscurePassword,
-          suffixIcon: IconButton(
-            icon: Icon(
-              _obscurePassword ? Icons.visibility : Icons.visibility_off,
-              color: AppColors.textSecondary,
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Campo de usuario
+                CustomTextField(
+                  controller: _usernameController,
+                  labelText: 'Usuario o Email',
+                  hintText: 'Ingresa tu usuario o email',
+                  prefixIcon: Icons.person_outline,
+                  validator: Validators.loginIdentifier,
+                  textInputAction: TextInputAction.next,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Campo de contraseña
+                CustomTextField(
+                  controller: _passwordController,
+                  labelText: 'Contraseña',
+                  hintText: 'Ingresa tu contraseña',
+                  prefixIcon: Icons.lock_outline,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      color: AppColors.textSecondary,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
+                  obscureText: _obscurePassword,
+                  validator: Validators.required,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _handleLogin(),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Recordarme
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberMe,
+                      onChanged: (value) {
+                        setState(() {
+                          _rememberMe = value ?? false;
+                        });
+                      },
+                      activeColor: AppColors.primaryBlue,
+                    ),
+                    Text(
+                      'Recordarme',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () {
+                        // TODO: Implementar recuperación de contraseña
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Función próximamente disponible'),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        '¿Olvidaste tu contraseña?',
+                        style: TextStyle(
+                          color: AppColors.primaryBlue,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Botón de login
+                CustomButton(
+                  text: 'INICIAR SESIÓN',
+                  onPressed: _handleLogin,
+                  icon: Icons.login,
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primaryBlue, AppColors.primaryGold],
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Divider
+                Row(
+                  children: [
+                    const Expanded(child: Divider(color: AppColors.textHint)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'o',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const Expanded(child: Divider(color: AppColors.textHint)),
+                  ],
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Botón de registro
+                CustomButton(
+                  text: 'CREAR CUENTA HUNTER',
+                  onPressed: _navigateToRegister,
+                  icon: Icons.person_add,
+                  isOutlined: true,
+                  outlineColor: AppColors.primaryGold,
+                  textColor: AppColors.primaryGold,
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Mensaje motivacional
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryBlue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.primaryBlue.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: AppColors.primaryBlue,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '¡Únete a la Guild de Hunters más poderosa!',
+                          style: TextStyle(
+                            color: AppColors.primaryBlue,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            onPressed: () {
-              setState(() {
-                _obscurePassword = !_obscurePassword;
-              });
-            },
-          ),
-          validator: AuthService.validatePassword,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _handleLogin(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLoginButton() {
-    return CustomButton(
-      text: AppStrings.login,
-      onPressed: _handleLogin,
-      icon: Icons.login,
-      gradient: AppColors.primaryGradient,
-    );
-  }
-
-  Widget _buildRememberMeRow() {
-    return Row(
-      children: [
-        Checkbox(
-          value: _rememberMe,
-          onChanged: (value) {
-            setState(() {
-              _rememberMe = value ?? false;
-            });
-          },
-          activeColor: AppColors.primaryGold,
-          checkColor: AppColors.darkBackground,
-        ),
-        const Text(
-          'Remember me',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-        const Spacer(),
-        TextButton(
-          onPressed: () {
-            // TODO: Implement forgot password
-            Fluttertoast.showToast(
-              msg: 'Forgot password feature coming soon!',
-              backgroundColor: AppColors.info,
-              textColor: AppColors.textPrimary,
-            );
-          },
-          child: const Text(
-            AppStrings.forgotPassword,
-            style: TextStyle(color: AppColors.primaryGold),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildRegisterPrompt() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Text(
-          AppStrings.dontHaveAccount,
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-        TextButton(
-          onPressed: _navigateToRegister,
-          child: const Text(
-            AppStrings.register,
-            style: TextStyle(
-              color: AppColors.primaryGold,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
