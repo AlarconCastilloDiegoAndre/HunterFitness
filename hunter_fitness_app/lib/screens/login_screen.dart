@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart'; // Importa tu servicio de API
+import '../services/api_service.dart';
+import 'registration_screen.dart'; // Importa la nueva pantalla de registro
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,11 +32,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
       setState(() {
         _isLoading = false;
-        _message = result['message'] ?? 'An unknown error occurred.';
+        _message = result['message'] ?? 'Ocurrió un error desconocido.';
       });
 
       if (result['success'] == true) {
-        // Login exitoso
         print('Login successful! Token: ${result['token']}');
         print('Hunter data: ${result['hunter']}');
         // Aquí puedes navegar a otra pantalla, por ejemplo, un Dashboard.
@@ -126,28 +126,33 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _login,
                         child: const Text('ACCEDER'),
                       ),
-                const SizedBox(height: 20),
-                if (_message.isNotEmpty && !_isLoading)
+                const SizedBox(height: 10), // Espacio reducido
+                // Mensaje de error (solo si no es exitoso y no está cargando)
+                if (_message.isNotEmpty && !_isLoading && !(_message.toLowerCase().contains('exitoso') || _message.toLowerCase().contains('successful')))
                   Padding(
-                    padding: const EdgeInsets.only(top: 10.0),
+                    padding: const EdgeInsets.only(top:10.0, bottom: 10.0),
                     child: Text(
                       _message,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: _message.toLowerCase().contains('error') || _message.toLowerCase().contains('failed')
-                            ? Colors.redAccent
-                            : Colors.greenAccent,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
                         fontSize: 14,
                       ),
                     ),
                   ),
-                // Aquí podrías agregar un botón para ir a la pantalla de registro
-                // TextButton(
-                //   onPressed: () {
-                //     // Navegar a RegisterScreen
-                //   },
-                //   child: Text('No tienes cuenta? Regístrate', style: TextStyle(color: Colors.blueAccent[100])),
-                // )
+                // Botón para ir a la pantalla de Registro
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const RegistrationScreen()),
+                    );
+                  },
+                  child: Text(
+                    '¿No tienes cuenta? Regístrate aquí',
+                    style: TextStyle(color: Colors.blueAccent[100]),
+                  ),
+                ),
               ],
             ),
           ),
