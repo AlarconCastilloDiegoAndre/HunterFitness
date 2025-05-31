@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'home_screen.dart'; // Asegúrate que esta importación sea correcta
+// import 'login_screen.dart'; // Ya no es necesario si navega directamente a home
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -19,19 +21,23 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   bool _isLoading = false;
   String _uiMessage = '';
-  bool? _messageIsErrorType; 
+  bool? _messageIsErrorType;
 
   Future<void> _register() async {
     if (!(_formKey.currentState?.validate() ?? false)) {
+       setState(() {
+        _uiMessage = '';
+        _messageIsErrorType = null;
+      });
       return;
     }
 
     if (_passwordController.text != _confirmPasswordController.text) {
       if (mounted) {
         setState(() {
-          _isLoading = false; 
-          _uiMessage = 'Las contraseñas no coinciden.';
-          _messageIsErrorType = true; 
+          _isLoading = false;
+          _uiMessage = '[ERROR SISTEMA] Las claves de acceso no coinciden.';
+          _messageIsErrorType = true;
         });
       }
       return;
@@ -40,7 +46,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (mounted) {
       setState(() {
         _isLoading = true;
-        _uiMessage = '';
+        _uiMessage = '[SISTEMA] Iniciando protocolo de registro...';
         _messageIsErrorType = null;
       });
     }
@@ -52,42 +58,49 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       hunterName: _hunterNameController.text.trim(),
     );
     
-    print('RegistrationScreen - RESULTADO CRUDO de ApiService: $result');
     if (!mounted) return;
 
     bool successFromApiService = result['success'] as bool? ?? false;
-    String messageFromApiService = result['message'] as String? ?? 'Ocurrió un error desconocido.';
-
-    print('RegistrationScreen - successFromApiService: $successFromApiService');
-    print('RegistrationScreen - messageFromApiService: "$messageFromApiService"');
+    String messageFromApiService = result['message'] as String? ?? '[SISTEMA] Fallo en la comunicación con la interfaz.';
     
     if (mounted) {
       setState(() {
         _isLoading = false;
-        _uiMessage = messageFromApiService;
+        _uiMessage = successFromApiService
+            ? '[SISTEMA] ${messageFromApiService}'
+            : '[ERROR SISTEMA] ${messageFromApiService}';
         _messageIsErrorType = !successFromApiService;
       });
     }
 
     if (successFromApiService) {
-      print('RegistrationScreen: Operación Exitosa! Mensaje: "$messageFromApiService"');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(messageFromApiService),
-          backgroundColor: Colors.green, // Color verde para éxito en SnackBar
-          duration: const Duration(seconds: 3),
-        ),
-      );
-      if (mounted) {
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            Navigator.pop(context); 
-          }
-        });
+      final hunterData = result['hunter']; // Accedemos a 'hunter' directamente
+      if (hunterData != null && hunterData is Map<String, dynamic> && mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _uiMessage,
+              style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: Colors.lightBlueAccent,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeScreen(hunterProfileData: hunterData),
+          ),
+          (Route<dynamic> route) => false,
+        );
+      } else {
+         if (mounted) {
+            setState(() {
+              _uiMessage = '[ERROR SISTEMA] No se pudieron cargar los datos del nuevo cazador.';
+              _messageIsErrorType = true;
+            });
+         }
       }
-    } else {
-      print('RegistrationScreen: Operación Fallida. Mensaje: "$messageFromApiService"');
-      // El mensaje de error ya se muestra en el widget Text
     }
   }
 
@@ -103,22 +116,39 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('RegistrationScreen build (inicio): _uiMessage="$_uiMessage", _messageIsErrorType=$_messageIsErrorType, _isLoading=$_isLoading');
-
-    Color messageColor = Colors.transparent;
+    Color messageColor = Colors.grey;
     if (_messageIsErrorType != null) {
-      messageColor = _messageIsErrorType! ? Colors.redAccent : Colors.green;
+      messageColor = _messageIsErrorType!
+          ? const Color(0xFFFF6666) 
+          : Colors.lightBlueAccent; 
     }
-    print('RegistrationScreen build - Text Color elegido: $messageColor');
+     if (_isLoading && _messageIsErrorType == null) {
+      messageColor = Colors.yellowAccent;
+    }
+
+    final Color appBarTextColor = Colors.lightBlueAccent;
+    final Color titleColor = Colors.lightBlueAccent;
+    final Color subtitleColor = Colors.grey;
+    final Color focusedInputBorderColor = Colors.lightBlueAccent;
+    final Color buttonColor = Colors.blueAccent;
+    final Color buttonTextColor = Colors.white;
+    final Color linkColor = Colors.yellowAccent;
 
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Hunter Fitness - Registro'),
+        title: Text(
+          '[NUEVO DESPERTAR]', 
+          style: TextStyle(color: appBarTextColor, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: IconThemeData(color: appBarTextColor),
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
           child: Form(
             key: _formKey,
             child: Column(
@@ -126,94 +156,134 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 Text(
-                  'Únete a la Cacería',
+                  'Registro de Cazador',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 26,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blueAccent[100],
+                    color: titleColor,
+                     shadows: [
+                      Shadow(
+                        blurRadius: 8.0,
+                        color: titleColor.withOpacity(0.7),
+                        offset: const Offset(0, 0),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 30),
-                TextFormField(
+                const SizedBox(height: 8),
+                Text(
+                  'Ingrese sus datos para unirse al Sistema.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: subtitleColor,
+                  ),
+                ),
+                const SizedBox(height: 35),
+                _buildTextFormField(
                   controller: _hunterNameController,
-                  decoration: const InputDecoration(labelText: 'Nombre de Cazador', prefixIcon: Icon(Icons.badge_outlined)),
-                  style: const TextStyle(color: Colors.white),
+                  labelText: 'Nombre de Cazador (Alias)',
+                  prefixIconData: Icons.account_box_outlined, 
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) return 'Por favor ingresa tu nombre de cazador';
-                    if (value.trim().length < 3) return 'Debe tener al menos 3 caracteres';
+                    if (value == null || value.trim().isEmpty) return '[ERROR] Alias requerido';
+                    if (value.trim().length < 3) return '[ERROR] Alias demasiado corto';
                     return null;
                   },
                 ),
-                const SizedBox(height: 15),
-                TextFormField(
+                const SizedBox(height: 18),
+                 _buildTextFormField(
                   controller: _usernameController,
-                  decoration: const InputDecoration(labelText: 'Usuario', prefixIcon: Icon(Icons.person_outline)),
-                  style: const TextStyle(color: Colors.white),
+                  labelText: 'Identificador Único (Usuario)',
+                  prefixIconData: Icons.fingerprint, 
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) return 'Por favor ingresa un nombre de usuario';
-                    if (value.trim().length < 3) return 'Debe tener al menos 3 caracteres';
-                    if (!RegExp(r"^[a-zA-Z0-9_-]+$").hasMatch(value.trim())) return 'Solo letras, números, _ y -';
+                    if (value == null || value.trim().isEmpty) return '[ERROR] Identificador requerido';
+                    if (value.trim().length < 3) return '[ERROR] Identificador corto';
+                    if (!RegExp(r"^[a-zA-Z0-9_-]+$").hasMatch(value.trim())) return '[ERROR] Formato no válido';
                     return null;
                   },
                 ),
-                const SizedBox(height: 15),
-                TextFormField(
+                const SizedBox(height: 18),
+                _buildTextFormField(
                   controller: _emailController,
-                  decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
-                  style: const TextStyle(color: Colors.white),
+                  labelText: 'Canal de Comunicación (Email)',
+                  prefixIconData: Icons.mail_outline, 
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) return 'Por favor ingresa tu email';
-                    if (!value.trim().contains('@') || !value.trim().contains('.')) return 'Ingresa un email válido';
+                    if (value == null || value.trim().isEmpty) return '[ERROR] Email requerido';
+                    if (!value.trim().contains('@') || !value.trim().contains('.')) return '[ERROR] Email no válido';
                     return null;
                   },
                 ),
-                const SizedBox(height: 15),
-                TextFormField(
+                const SizedBox(height: 18),
+                _buildTextFormField(
                   controller: _passwordController,
-                  decoration: const InputDecoration(labelText: 'Contraseña', prefixIcon: Icon(Icons.lock_outline)),
+                  labelText: 'Clave de Acceso',
+                  prefixIconData: Icons.shield_outlined, 
                   obscureText: true,
-                  style: const TextStyle(color: Colors.white),
                   validator: (value) {
-                    if (value == null || value.isEmpty) return 'Por favor ingresa una contraseña';
-                    if (value.length < 6) return 'La contraseña debe tener al menos 6 caracteres';
+                    if (value == null || value.isEmpty) return '[ERROR] Clave requerida';
+                    if (value.length < 6) return '[ERROR] Clave demasiado débil';
                     return null;
                   },
                 ),
-                const SizedBox(height: 15),
-                TextFormField(
+                const SizedBox(height: 18),
+                _buildTextFormField(
                   controller: _confirmPasswordController,
-                  decoration: const InputDecoration(labelText: 'Confirmar Contraseña', prefixIcon: Icon(Icons.lock_reset_outlined)),
+                  labelText: 'Confirmar Clave de Acceso',
+                  prefixIconData: Icons.verified_user_outlined, 
                   obscureText: true,
-                  style: const TextStyle(color: Colors.white),
                   validator: (value) {
-                    if (value == null || value.isEmpty) return 'Por favor confirma tu contraseña';
-                    if (value != _passwordController.text) return 'Las contraseñas no coinciden';
+                    if (value == null || value.isEmpty) return '[ERROR] Confirmación requerida';
+                    if (value != _passwordController.text) return '[ERROR] Las claves no coinciden';
                     return null;
                   },
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 40),
                 _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : ElevatedButton(onPressed: _register, child: const Text('REGISTRARSE')),
+                    ? Center(
+                        child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(focusedInputBorderColor)),
+                          const SizedBox(height: 15),
+                          Text(
+                            _uiMessage,
+                            style: TextStyle(color: messageColor, fontWeight: FontWeight.bold, fontSize: 14),
+                          )
+                        ],
+                      ))
+                    : ElevatedButton(
+                        onPressed: _register,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: buttonColor,
+                          foregroundColor: buttonTextColor,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        child: const Text('COMPLETAR REGISTRO'),
+                      ),
                 const SizedBox(height: 15),
-                 if (_uiMessage.isNotEmpty && !_isLoading)
+                if (_uiMessage.isNotEmpty && !_isLoading)
                   Padding(
-                    padding: const EdgeInsets.only(top: 10.0, bottom:10.0),
+                    padding: const EdgeInsets.symmetric(vertical: 10.0),
                     child: Text(
                       _uiMessage,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: messageColor, 
+                        color: messageColor,
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
+                const SizedBox(height: 20),
                 TextButton(
                   onPressed: () {
-                    if(mounted) {
+                     if(mounted) {
                       setState(() {
                         _uiMessage = '';
                         _messageIsErrorType = null;
@@ -221,13 +291,74 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     }
                     Navigator.pop(context); 
                   },
-                  child: Text('¿Ya tienes cuenta? Inicia Sesión', style: TextStyle(color: Colors.blueAccent[100])),
+                  child: Text(
+                    '[ Volver a la pantalla de Autenticación ]', 
+                    style: TextStyle(
+                      color: linkColor,
+                      decoration: TextDecoration.underline,
+                      decorationColor: linkColor.withOpacity(0.7),
+                      fontSize: 13,
+                    )
+                  ),
                 )
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTextFormField({
+    required TextEditingController controller,
+    required String labelText,
+    required IconData prefixIconData,
+    String? hintText,
+    bool obscureText = false,
+    TextInputType keyboardType = TextInputType.text,
+    required String? Function(String?) validator,
+  }) {
+    final Color inputLabelColor = Colors.grey;
+    final Color inputPrefixIconColor = Colors.lightBlueAccent;
+    final Color inputFillColor = Colors.black.withOpacity(0.5);
+    final Color inputEnabledBorderColor = Colors.blueGrey.withOpacity(0.7);
+    final Color inputFocusedBorderColor = Colors.lightBlueAccent;
+    final Color inputErrorBorderColor = const Color(0xFFFF6B6B);
+    final Color inputTextColor = Colors.white;
+
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: labelText,
+        labelStyle: TextStyle(color: inputLabelColor, fontSize: 14),
+        hintText: hintText,
+        hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+        prefixIcon: Icon(prefixIconData, color: inputPrefixIconColor, size: 20),
+        filled: true,
+        fillColor: inputFillColor,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: inputEnabledBorderColor),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: inputFocusedBorderColor, width: 1.5),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: inputErrorBorderColor),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: inputErrorBorderColor, width: 1.5),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        errorStyle: TextStyle(color: inputErrorBorderColor, fontWeight: FontWeight.bold, fontSize: 12),
+      ),
+      style: TextStyle(color: inputTextColor, fontSize: 15),
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      validator: validator,
     );
   }
 }

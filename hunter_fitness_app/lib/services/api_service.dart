@@ -6,16 +6,34 @@ class ApiService {
   static const String _baseUrl = "https://hunter-fitness-api.azurewebsites.net/api";
   final _storage = const FlutterSecureStorage();
 
+  Future<String?> getToken() async {
+    return await _storage.read(key: 'jwt_token');
+  }
+
+  Future<void> logout() async {
+    await _storage.delete(key: 'jwt_token');
+    print('ApiService: Token eliminado, sesión cerrada.');
+  }
+
   Future<Map<String, dynamic>> _handleApiResponse(http.Response response, String operation) async {
     print('--- INICIO _handleApiResponse para: $operation ---');
     print('$operation API Status Code: ${response.statusCode}');
     final String rawResponseBody = response.body;
     print('$operation API Response Body (RAW): "$rawResponseBody"');
 
-    if (rawResponseBody.isEmpty) {
-      print('$operation API Error: Cuerpo de respuesta vacío.');
-      return {'success': false, 'message': 'El servidor devolvió una respuesta vacía.'};
+    if (rawResponseBody.isEmpty && response.statusCode != 204) { // 204 No Content es una respuesta vacía válida
+      print('$operation API Error: Cuerpo de respuesta vacío (y no es 204).');
+      return {'success': false, 'message': 'El servidor devolvió una respuesta vacía inesperada.'};
     }
+     if (rawResponseBody.isEmpty && response.statusCode == 204) {
+      print('$operation API Info: Respuesta 204 No Content, cuerpo vacío es esperado.');
+      // Para operaciones como logout o delete que pueden devolver 204, esto es un éxito.
+      // Ajustar según la necesidad de la operación específica.
+      // Si la operación que llama espera datos, esto debería ser un error lógico.
+      // Por ahora, asumiremos que si es 204, la operación fue exitosa a menos que se indique lo contrario.
+      return {'success': true, 'message': 'Operación completada sin contenido de respuesta.', 'data': null};
+    }
+
 
     Map<String, dynamic> outerResponseData;
     try {
@@ -32,40 +50,45 @@ class ApiService {
       return {'success': false, 'message': 'Respuesta inesperada del servidor (formato incorrecto exterior).'};
     }
 
-    print('$operation - DEBUG: Listando todas las claves y valores en outerResponseData:');
-    outerResponseData.forEach((key, value) {
-      print('$operation - DEBUG: Key: "$key" | Value: "$value" | RuntimeType: ${value.runtimeType}');
-    });
-
     bool apiOuterSuccess = false;
     String apiOuterMessage = 'Mensaje no proporcionado por la API (predeterminado).';
 
     if (outerResponseData.containsKey('Success')) {
       var successValue = outerResponseData['Success'];
-      print('$operation - DEBUG: Clave "Success" (PascalCase) ENCONTRADA. Valor: $successValue, Tipo: ${successValue.runtimeType}');
       if (successValue is bool) {
         apiOuterSuccess = successValue;
       } else if (successValue is String && successValue.toLowerCase() == 'true') {
         apiOuterSuccess = true;
       }
-    } else {
-      print('$operation - DEBUG CRITICAL: Clave "Success" (PascalCase) NO ENCONTRADA en outerResponseData. Keys: ${outerResponseData.keys.toList()}');
+    } else if (outerResponseData.containsKey('success')) { // Fallback a camelCase 'success'
+        var successValue = outerResponseData['success'];
+        if (successValue is bool) {
+          apiOuterSuccess = successValue;
+        } else if (successValue is String && successValue.toLowerCase() == 'true') {
+          apiOuterSuccess = true;
+        }
     }
+
 
     if (outerResponseData.containsKey('Message')) {
       var messageValue = outerResponseData['Message'];
-      print('$operation - DEBUG: Clave "Message" (PascalCase) ENCONTRADA. Valor: "$messageValue", Tipo: ${messageValue.runtimeType}');
-      if (messageValue is String) {
+       if (messageValue is String) {
         apiOuterMessage = messageValue;
       } else if (messageValue != null) {
         apiOuterMessage = messageValue.toString();
       }
-    } else {
-      print('$operation - DEBUG WARNING: Clave "Message" (PascalCase) NO ENCONTRADA en outerResponseData.');
+    } else if (outerResponseData.containsKey('message')) { // Fallback a camelCase 'message'
+        var messageValue = outerResponseData['message'];
+        if (messageValue is String) {
+          apiOuterMessage = messageValue;
+        } else if (messageValue != null) {
+          apiOuterMessage = messageValue.toString();
+        }
     }
 
+
     try {
-      bool httpSuccess = (response.statusCode == 200 || response.statusCode == 201);
+      bool httpSuccess = (response.statusCode >= 200 && response.statusCode < 300);
 
       print('$operation - httpSuccess: $httpSuccess (StatusCode: ${response.statusCode})');
       print('$operation - apiOuterSuccess (determinado): $apiOuterSuccess');
@@ -76,87 +99,62 @@ class ApiService {
         return {'success': false, 'message': '$apiOuterMessage (Error HTTP: ${response.statusCode})'};
       }
       
-      // Si la API externa (wrapper) indica que no fue exitoso, entonces es un fallo.
-      if (!apiOuterSuccess) {
-          print('$operation - Fallo declarado por API externa (apiOuterSuccess es false). Mensaje: "$apiOuterMessage"');
+      if (!apiOuterSuccess && httpSuccess) { // Si HTTP fue éxito pero la API dice que no (ej: validación fallida)
+          print('$operation - Fallo declarado por API (apiOuterSuccess es false), aunque HTTP fue ${response.statusCode}. Mensaje: "$apiOuterMessage"');
           return {'success': false, 'message': apiOuterMessage};
       }
-
-      // Si llegamos aquí, httpSuccess ES true Y apiOuterSuccess ES true.
-      // Esto se considera un ÉXITO para la UI.
-      // Ahora intentamos extraer datos adicionales del campo 'Data'.
-
-      var dataField = outerResponseData['Data'];
+      
+      // Si llegamos aquí, httpSuccess ES true Y apiOuterSuccess ES true (o no está presente y asumimos éxito por HTTP status).
+      var dataField = outerResponseData['Data'] ?? outerResponseData['data']; // Considerar PascalCase y camelCase
       Map<String, dynamic>? actualDataPayload;
       String? token;
-      var hunterData; // Puede ser Map o cualquier otro tipo.
-      String successMessageToShow = apiOuterMessage; // Por defecto, el mensaje de la API externa.
+      var hunterData;
+      String successMessageToShow = apiOuterMessage;
 
       if (dataField is Map<String, dynamic>) {
         actualDataPayload = dataField;
-        print('$operation - Campo "Data" SÍ es un Map<String, dynamic>.');
       } else if (dataField is String) {
-        print('$operation - Campo "Data" es un String. Intentando decodificarlo como JSON...');
         try {
           var decodedDataString = jsonDecode(dataField);
           if (decodedDataString is Map<String, dynamic>) {
             actualDataPayload = decodedDataString;
-            print('$operation - String "Data" decodificado exitosamente a Map.');
-          } else {
-            print('$operation API WARNING: String "Data" decodificado pero no es un Mapa. Tipo: ${decodedDataString.runtimeType}. Se usará el mensaje externo.');
           }
-        } catch (e) {
-          print('$operation API WARNING: Fallo al decodificar String "Data". Error: $e. Contenido: "$dataField". Se usará el mensaje externo.');
-        }
-      } else if (dataField != null) {
-         print('$operation API WARNING: El campo "Data" NO es un Mapa ni un String JSON válido. Tipo actual: ${dataField.runtimeType}. Se usará el mensaje externo.');
-      } else {
-        print('$operation - El campo "Data" es nulo. Se usará el mensaje externo.');
-      }
-
-      // Si tenemos un payload interno (actualDataPayload), intentamos extraer información.
-      if (actualDataPayload != null) {
-        token = actualDataPayload['token'] as String?;
-        hunterData = actualDataPayload['hunter'];
-
-        // Opcional: si el mensaje interno es más específico para el éxito Y la operación externa fue exitosa.
-        String? apiInnerMessage = actualDataPayload['message'] as String?;
-        if (apiInnerMessage != null && apiInnerMessage.isNotEmpty) {
-          // Podrías decidir usar el mensaje interno si es más relevante para el éxito.
-          // Por ejemplo, si el outer message es genérico como "Operación exitosa"
-          // y el inner message es "Token generado y perfil cargado".
-          // Para este caso, el `apiOuterMessage` ya parece ser el mensaje de éxito deseado ("Welcome back...").
-          // successMessageToShow = apiInnerMessage; // Descomentar si prefieres el mensaje interno en caso de éxito.
-        }
-         print('$operation - apiInnerMessage (del actualDataPayload): "$apiInnerMessage"');
-      }
-        
-      if (token != null) {
-        try {
-          await _storage.write(key: 'jwt_token', value: token);
-          print('ApiService ($operation): Token guardado.');
-        } catch (storageError) {
-          print('ApiService ($operation): ÉXITO API, PERO FALLÓ AL GUARDAR TOKEN. Error: $storageError.');
-          // Considera si esto debería convertir la operación en un fallo para la UI.
-          // Por ahora, se mantiene como éxito ya que el login/registro en sí fue exitoso.
-        }
-      } else {
-        print('ApiService ($operation): Éxito API, no se encontró token en actualDataPayload.');
+        } catch (e) { /* No hacer nada si no es JSON, ya tenemos apiOuterSuccess */ }
       }
       
+      // Para login/registro específicamente, esperamos token y hunter en el payload de Data
+      if (operation == 'LOGIN' || operation == 'REGISTER') {
+        if (actualDataPayload != null) {
+          token = actualDataPayload['token'] as String?;
+          hunterData = actualDataPayload['hunter'];
+          String? apiInnerMessage = actualDataPayload['message'] as String?;
+          if (apiInnerMessage != null && apiInnerMessage.isNotEmpty && apiOuterMessage == 'Mensaje no proporcionado por la API (predeterminado).') {
+             successMessageToShow = apiInnerMessage;
+          }
+        }
+        if (token != null) {
+          await _storage.write(key: 'jwt_token', value: token);
+        }
+      }
+
       Map<String, dynamic> successResult = {
-        'success': true, // <--- ESTA ES LA CLAVE PARA EL COLOR VERDE
-        'message': successMessageToShow, 
-        'token': token,
-        'hunter': hunterData
+        'success': true,
+        'message': successMessageToShow,
+        'data': dataField, // Devolver el campo 'Data' completo para que el llamador lo procese
       };
-      print('--- FIN _handleApiResponse (ÉXITO LÓGICO DEFINIDO POR HTTP Y API EXTERNA): $successResult ---');
+      // Específicamente para login/registro, añadir token y hunter al nivel superior para fácil acceso
+      if (operation == 'LOGIN' || operation == 'REGISTER') {
+        successResult['token'] = token;
+        successResult['hunter'] = hunterData;
+      }
+
+      print('--- FIN _handleApiResponse (ÉXITO LÓGICO): $successResult ---');
       return successResult;
 
     } catch (e, s) { 
-      print('$operation API Error: Excepción INESPERADA dentro de _handleApiResponse (después del parseo inicial). Error: $e');
+      print('$operation API Error: Excepción INESPERADA procesando la respuesta. Error: $e');
       print('$operation API StackTrace: $s');
-      return {'success': false, 'message': 'Error interno crítico procesando la respuesta del servidor.'};
+      return {'success': false, 'message': 'Error interno crítico procesando la respuesta.'};
     }
   }
 
@@ -171,7 +169,7 @@ class ApiService {
       );
       return await _handleApiResponse(response, 'LOGIN');
     } catch (e) {
-      print('ApiService: Excepción en el método login (probablemente red/conexión): ${e.toString()}');
+      print('ApiService: Excepción en el método login (red/conexión): ${e.toString()}');
       return {'success': false, 'message': 'Error de red o conexión (login): ${e.toString()}'};
     }
   }
@@ -183,7 +181,7 @@ class ApiService {
     required String hunterName,
   }) async {
     final Uri registerUrl = Uri.parse('$_baseUrl/auth/register');
-    print('ApiService: Intentando registrar nuevo usuario: $username, Email: $email, HunterName: $hunterName');
+    print('ApiService: Intentando registrar: $username, Email: $email, HunterName: $hunterName');
     try {
       final response = await http.post(
         registerUrl,
@@ -197,16 +195,32 @@ class ApiService {
       );
       return await _handleApiResponse(response, 'REGISTER');
     } catch (e) {
-      print('ApiService: Excepción en registerUser (probablemente red/conexión): ${e.toString()}');
+      print('ApiService: Excepción en registerUser (red/conexión): ${e.toString()}');
       return {'success': false, 'message': 'Error de red o conexión (registro): ${e.toString()}'};
     }
   }
 
-  Future<String?> getToken() async {
-    return await _storage.read(key: 'jwt_token');
-  }
+  Future<Map<String, dynamic>> getDailyQuests() async {
+    final String? token = await getToken();
+    if (token == null) {
+      print('ApiService (getDailyQuests): Token no encontrado. Abortando.');
+      return {'success': false, 'message': 'Autenticación requerida. No se encontró token.'};
+    }
 
-  Future<void> logout() async {
-    await _storage.delete(key: 'jwt_token');
+    final Uri dailyQuestsUrl = Uri.parse('$_baseUrl/quests/daily');
+    print('ApiService: Obteniendo misiones diarias...');
+    try {
+      final response = await http.get(
+        dailyQuestsUrl,
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      return await _handleApiResponse(response, 'GET_DAILY_QUESTS');
+    } catch (e) {
+      print('ApiService: Excepción en getDailyQuests (red/conexión): ${e.toString()}');
+      return {'success': false, 'message': 'Error de red o conexión (misiones diarias): ${e.toString()}'};
+    }
   }
 }

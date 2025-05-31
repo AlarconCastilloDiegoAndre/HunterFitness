@@ -43,16 +43,20 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/sounds/
+    - assets/animations/
   
-  # Assets (si los tuvieras para la UI)
-  # assets:
-  #   - assets/images/
-  #   - assets/icons/
-  
-  # Fonts (si los tuvieras)
-  # fonts:
-  #   - family: HunterFont
-  #     fonts:
-  #       - asset: assets/fonts/Roboto-Regular.ttf
-  #       - asset: assets/fonts/Roboto-Bold.ttf
-  #         weight: 700
+#  fonts:
+#    - family: SoloLevelingFont   # Elige un nombre para tu fuente temática
+#      fonts:
+#        - asset: assets/fonts/nombre_de_tu_fuente_rpg.ttf
+#        - asset: assets/fonts/nombre_de_tu_fuente_rpg_bold.ttf
+#          weight: 700
+#    - family: SystemInterfaceFont # Una fuente más legible para cuerpos de texto
+#      fonts:
+#        - asset: assets/fonts/nombre_de_tu_fuente_sans_regular.ttf
+#        - asset: assets/fonts/nombre_de_tu_fuente_sans_bold.ttf
+#          weight: 700

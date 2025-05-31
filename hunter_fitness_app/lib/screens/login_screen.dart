@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'registration_screen.dart';
-// import 'home_screen.dart'; // Descomenta si tienes una HomeScreen
+import 'home_screen.dart'; // Asegúrate que esta importación sea correcta
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,14 +22,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (!(_formKey.currentState?.validate() ?? false)) {
+      setState(() {
+        _uiMessage = ''; 
+        _messageIsErrorType = null;
+      });
       return;
     }
 
     if (mounted) {
       setState(() {
         _isLoading = true;
-        _uiMessage = ''; 
-        _messageIsErrorType = null; 
+        _uiMessage = '[SISTEMA] Iniciando protocolo de acceso...';
+        _messageIsErrorType = null;
       });
     }
 
@@ -38,45 +42,48 @@ class _LoginScreenState extends State<LoginScreen> {
       _passwordController.text,
     );
 
-    print('LoginScreen - RESULTADO CRUDO de ApiService: $result');
-    if (!mounted) return; 
+    if (!mounted) return;
 
     bool successFromApiService = result['success'] as bool? ?? false;
-    String messageFromApiService = result['message'] as String? ?? 'Ocurrió un error desconocido.';
-    
-    print('LoginScreen - successFromApiService: $successFromApiService');
-    print('LoginScreen - messageFromApiService: "$messageFromApiService"');
+    String messageFromApiService = result['message'] as String? ?? '[SISTEMA] Error de conexión con la interfaz.';
 
     if (mounted) {
       setState(() {
         _isLoading = false;
-        _uiMessage = messageFromApiService;
-        _messageIsErrorType = !successFromApiService; 
+        _uiMessage = successFromApiService
+            ? '[SISTEMA] ${messageFromApiService}'
+            : '[ERROR SISTEMA] ${messageFromApiService}';
+        _messageIsErrorType = !successFromApiService;
       });
     }
 
     if (successFromApiService) {
-      print('LoginScreen: Operación Exitosa! Mensaje: "$messageFromApiService"');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(messageFromApiService),
-          backgroundColor: Colors.green, // Color verde para éxito en SnackBar
-          duration: const Duration(seconds: 3),
-        ),
-      );
-      // NAVEGACIÓN (descomentar y ajustar cuando tengas HomeScreen)
-      // Future.delayed(const Duration(seconds: 1), () {
-      //   if (mounted) {
-      //     // Navigator.pushReplacement(
-      //     //   context,
-      //     //   MaterialPageRoute(builder: (context) => HomeScreen(hunterData: result['hunter'])),
-      //     // );
-      //     print("Navegación a HomeScreen debería ocurrir aquí.");
-      //   }
-      // });
-    } else {
-      print('LoginScreen: Operación Fallida. Mensaje: "$messageFromApiService"');
-      // El mensaje de error ya se muestra en el widget Text
+      final hunterData = result['hunter']; // Accedemos a 'hunter' directamente
+      if (hunterData != null && hunterData is Map<String, dynamic> && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _uiMessage,
+              style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: Colors.lightBlueAccent,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeScreen(hunterProfileData: hunterData),
+          ),
+        );
+      } else {
+        if (mounted) {
+          setState(() {
+            _uiMessage = '[ERROR SISTEMA] Datos del cazador no válidos o ausentes.';
+            _messageIsErrorType = true;
+          });
+        }
+      }
     }
   }
 
@@ -89,23 +96,29 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('LoginScreen build (inicio): _uiMessage="$_uiMessage", _messageIsErrorType=$_messageIsErrorType, _isLoading=$_isLoading');
-
-    Color messageColor = Colors.transparent; 
-    if (_messageIsErrorType != null) { 
-      messageColor = _messageIsErrorType! ? Colors.redAccent : Colors.green;
+    Color messageColor = Colors.grey;
+    if (_messageIsErrorType != null) {
+      messageColor = _messageIsErrorType!
+          ? const Color(0xFFFF6666) 
+          : Colors.lightBlueAccent; 
     }
-    print('LoginScreen build - Text Color elegido: $messageColor');
+    if (_isLoading && _messageIsErrorType == null) {
+      messageColor = Colors.yellowAccent; 
+    }
 
+    final Color primaryTextColor = Colors.lightBlueAccent;
+    final Color secondaryTextColor = Colors.grey;
+    final Color inputBorderColor = Colors.blueGrey.withOpacity(0.7);
+    final Color focusedInputBorderColor = Colors.lightBlueAccent;
+    final Color buttonColor = Colors.blueAccent;
+    final Color buttonTextColor = Colors.white;
+    final Color linkColor = Colors.yellowAccent;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Hunter Fitness - Login'),
-        centerTitle: true,
-      ),
+      backgroundColor: Colors.black,
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 40.0),
           child: Form(
             key: _formKey,
             child: Column(
@@ -113,26 +126,61 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 Text(
-                  'Ingresa Cazador',
+                  '[ INICIAR SESIÓN ]',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blueAccent[100],
+                    color: primaryTextColor,
+                    shadows: [
+                      Shadow(
+                        blurRadius: 10.0,
+                        color: primaryTextColor.withOpacity(0.6),
+                        offset: const Offset(0, 0),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 8),
+                Text(
+                  'Acceso al Sistema de Cazadores',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: secondaryTextColor,
+                  ),
+                ),
+                const SizedBox(height: 50),
                 TextFormField(
                   controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Usuario o Email',
-                    hintText: 'Escribe tu usuario o email',
-                    prefixIcon: Icon(Icons.person_outline),
+                  decoration: InputDecoration(
+                    labelText: 'ID de Cazador / Email',
+                    labelStyle: TextStyle(color: secondaryTextColor),
+                    prefixIcon: Icon(Icons.account_circle_outlined, color: primaryTextColor, size: 20),
+                    filled: true,
+                    fillColor: Colors.black.withOpacity(0.5),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: inputBorderColor),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: focusedInputBorderColor, width: 1.5),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                     errorBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Color(0xFFFF6B6B)),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Color(0xFFFF6B6B), width: 1.5),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    errorStyle: const TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.bold),
                   ),
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Por favor ingresa tu usuario o email';
+                      return '[Error: Identificador requerido]';
                     }
                     return null;
                   },
@@ -140,47 +188,87 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 20),
                 TextFormField(
                   controller: _passwordController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Contraseña',
-                    hintText: 'Escribe tu contraseña',
-                    prefixIcon: Icon(Icons.lock_outline),
+                    labelStyle: TextStyle(color: secondaryTextColor),
+                    prefixIcon: Icon(Icons.lock_outline, color: primaryTextColor, size: 20),
+                    filled: true,
+                    fillColor: Colors.black.withOpacity(0.5),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: inputBorderColor),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: focusedInputBorderColor, width: 1.5),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Color(0xFFFF6B6B)),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Color(0xFFFF6B6B), width: 1.5),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    errorStyle: const TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.bold),
                   ),
                   obscureText: true,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Por favor ingresa tu contraseña';
+                      return '[Error: Contraseña requerida]';
                     }
                     return null;
                   },
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 35),
                 _isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? Center(
+                        child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(focusedInputBorderColor)),
+                          const SizedBox(height: 15),
+                          Text(
+                            _uiMessage,
+                            style: TextStyle(color: messageColor, fontWeight: FontWeight.bold, fontSize: 14),
+                          )
+                        ],
+                      ))
                     : ElevatedButton(
                         onPressed: _login,
-                        child: const Text('ACCEDER'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: buttonColor,
+                          foregroundColor: buttonTextColor,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        child: const Text('ACCEDER AL SISTEMA'),
                       ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 15),
                 if (_uiMessage.isNotEmpty && !_isLoading)
                   Padding(
-                    padding: const EdgeInsets.only(top:10.0, bottom: 10.0),
+                    padding: const EdgeInsets.symmetric(vertical: 10.0),
                     child: Text(
                       _uiMessage,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: messageColor, 
+                        color: messageColor,
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
+                const SizedBox(height: 25),
                 TextButton(
                   onPressed: () {
-                    if(mounted) {
+                    if (mounted) {
                       setState(() {
                         _uiMessage = '';
-                        _messageIsErrorType = null; 
+                        _messageIsErrorType = null;
                       });
                     }
                     Navigator.push(
@@ -189,8 +277,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     );
                   },
                   child: Text(
-                    '¿No tienes cuenta? Regístrate aquí',
-                    style: TextStyle(color: Colors.blueAccent[100]),
+                    '¿No tienes una Licencia de Cazador? Regístrate',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: linkColor,
+                      decoration: TextDecoration.underline,
+                      decorationColor: linkColor,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ],
