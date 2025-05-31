@@ -19,7 +19,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   bool _isLoading = false;
   String _uiMessage = '';
-  bool? _messageIsErrorType; // null, true (error), false (éxito)
+  bool? _messageIsErrorType; 
 
   Future<void> _register() async {
     if (!(_formKey.currentState?.validate() ?? false)) {
@@ -29,9 +29,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (_passwordController.text != _confirmPasswordController.text) {
       if (mounted) {
         setState(() {
-          _isLoading = false; // Asegurarse que no esté cargando
+          _isLoading = false; 
           _uiMessage = 'Las contraseñas no coinciden.';
-          _messageIsErrorType = true; // Es un error de validación
+          _messageIsErrorType = true; 
         });
       }
       return;
@@ -74,7 +74,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(messageFromApiService),
-          backgroundColor: Colors.green,
+          backgroundColor: Colors.green, // Color verde para éxito en SnackBar
           duration: const Duration(seconds: 3),
         ),
       );
@@ -205,7 +205,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       _uiMessage,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: messageColor, // Usar el color determinado al inicio del build
+                        color: messageColor, 
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),

@@ -18,21 +18,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   String _uiMessage = '';
-  // Para el color del mensaje: true si es un error, false si es éxito.
-  // Se inicializa como null para que no se muestre nada hasta la primera operación.
   bool? _messageIsErrorType;
 
   Future<void> _login() async {
     if (!(_formKey.currentState?.validate() ?? false)) {
-      return; // No hacer nada si el formulario no es válido
+      return;
     }
 
-    // Iniciar operación
     if (mounted) {
       setState(() {
         _isLoading = true;
-        _uiMessage = ''; // Limpiar mensaje anterior
-        _messageIsErrorType = null; // Resetear el tipo de mensaje
+        _uiMessage = ''; 
+        _messageIsErrorType = null; 
       });
     }
 
@@ -42,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     print('LoginScreen - RESULTADO CRUDO de ApiService: $result');
-    if (!mounted) return; // Verificar si el widget sigue montado
+    if (!mounted) return; 
 
     bool successFromApiService = result['success'] as bool? ?? false;
     String messageFromApiService = result['message'] as String? ?? 'Ocurrió un error desconocido.';
@@ -50,12 +47,11 @@ class _LoginScreenState extends State<LoginScreen> {
     print('LoginScreen - successFromApiService: $successFromApiService');
     print('LoginScreen - messageFromApiService: "$messageFromApiService"');
 
-    // Actualizar UI después de la operación
     if (mounted) {
       setState(() {
         _isLoading = false;
         _uiMessage = messageFromApiService;
-        _messageIsErrorType = !successFromApiService; // Si NO es success, entonces es un error
+        _messageIsErrorType = !successFromApiService; 
       });
     }
 
@@ -64,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(messageFromApiService),
-          backgroundColor: Colors.green,
+          backgroundColor: Colors.green, // Color verde para éxito en SnackBar
           duration: const Duration(seconds: 3),
         ),
       );
@@ -95,8 +91,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     print('LoginScreen build (inicio): _uiMessage="$_uiMessage", _messageIsErrorType=$_messageIsErrorType, _isLoading=$_isLoading');
 
-    Color messageColor = Colors.transparent; // Color por defecto (invisible)
-    if (_messageIsErrorType != null) { // Solo asignar color si hay un mensaje que mostrar
+    Color messageColor = Colors.transparent; 
+    if (_messageIsErrorType != null) { 
       messageColor = _messageIsErrorType! ? Colors.redAccent : Colors.green;
     }
     print('LoginScreen build - Text Color elegido: $messageColor');
@@ -173,7 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       _uiMessage,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: messageColor, // Usar el color determinado al inicio del build
+                        color: messageColor, 
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
@@ -184,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     if(mounted) {
                       setState(() {
                         _uiMessage = '';
-                        _messageIsErrorType = null; // Resetear para que no muestre nada
+                        _messageIsErrorType = null; 
                       });
                     }
                     Navigator.push(

@@ -40,15 +40,13 @@ class ApiService {
     bool apiOuterSuccess = false;
     String apiOuterMessage = 'Mensaje no proporcionado por la API (predeterminado).';
 
-    // Buscar directamente 'Success' y 'Message' (PascalCase) según los logs
     if (outerResponseData.containsKey('Success')) {
       var successValue = outerResponseData['Success'];
       print('$operation - DEBUG: Clave "Success" (PascalCase) ENCONTRADA. Valor: $successValue, Tipo: ${successValue.runtimeType}');
       if (successValue is bool) {
         apiOuterSuccess = successValue;
-      } else {
-        print('$operation - DEBUG WARNING: Clave "Success" es ${successValue.runtimeType}, no bool.');
-        if (successValue is String && successValue.toLowerCase() == 'true') apiOuterSuccess = true;
+      } else if (successValue is String && successValue.toLowerCase() == 'true') {
+        apiOuterSuccess = true;
       }
     } else {
       print('$operation - DEBUG CRITICAL: Clave "Success" (PascalCase) NO ENCONTRADA en outerResponseData. Keys: ${outerResponseData.keys.toList()}');
@@ -59,9 +57,8 @@ class ApiService {
       print('$operation - DEBUG: Clave "Message" (PascalCase) ENCONTRADA. Valor: "$messageValue", Tipo: ${messageValue.runtimeType}');
       if (messageValue is String) {
         apiOuterMessage = messageValue;
-      } else {
-        print('$operation - DEBUG WARNING: Clave "Message" es ${messageValue.runtimeType}, no String.');
-        if (messageValue != null) apiOuterMessage = messageValue.toString();
+      } else if (messageValue != null) {
+        apiOuterMessage = messageValue.toString();
       }
     } else {
       print('$operation - DEBUG WARNING: Clave "Message" (PascalCase) NO ENCONTRADA en outerResponseData.');
@@ -79,25 +76,22 @@ class ApiService {
         return {'success': false, 'message': '$apiOuterMessage (Error HTTP: ${response.statusCode})'};
       }
       
+      // Si la API externa (wrapper) indica que no fue exitoso, entonces es un fallo.
       if (!apiOuterSuccess) {
           print('$operation - Fallo declarado por API externa (apiOuterSuccess es false). Mensaje: "$apiOuterMessage"');
           return {'success': false, 'message': apiOuterMessage};
       }
 
-      // Buscar directamente 'Data' (PascalCase)
+      // Si llegamos aquí, httpSuccess ES true Y apiOuterSuccess ES true.
+      // Esto se considera un ÉXITO para la UI.
+      // Ahora intentamos extraer datos adicionales del campo 'Data'.
+
       var dataField = outerResponseData['Data'];
       Map<String, dynamic>? actualDataPayload;
+      String? token;
+      var hunterData; // Puede ser Map o cualquier otro tipo.
+      String successMessageToShow = apiOuterMessage; // Por defecto, el mensaje de la API externa.
 
-      if (dataField == null) {
-          print('$operation - El campo "Data" es nulo. Tratando como éxito basado en apiOuterSuccess.');
-            Map<String, dynamic> successResult = {
-            'success': true,
-            'message': apiOuterMessage, 
-          };
-          print('--- FIN _handleApiResponse (ÉXITO, PERO "Data" ES NULL): $successResult ---');
-          return successResult;
-      }
-      
       if (dataField is Map<String, dynamic>) {
         actualDataPayload = dataField;
         print('$operation - Campo "Data" SÍ es un Map<String, dynamic>.');
@@ -109,63 +103,56 @@ class ApiService {
             actualDataPayload = decodedDataString;
             print('$operation - String "Data" decodificado exitosamente a Map.');
           } else {
-            print('$operation API Error: String "Data" decodificado pero no es un Mapa. Tipo: ${decodedDataString.runtimeType}');
-            return {'success': false, 'message': 'Formato de datos internos inesperado (data string no es objeto JSON).'};
+            print('$operation API WARNING: String "Data" decodificado pero no es un Mapa. Tipo: ${decodedDataString.runtimeType}. Se usará el mensaje externo.');
           }
         } catch (e) {
-          print('$operation API Error: Fallo al decodificar String "Data". Error: $e. Contenido: "$dataField"');
-          return {'success': false, 'message': 'Respuesta con datos internos corruptos (data string inválido).'};
+          print('$operation API WARNING: Fallo al decodificar String "Data". Error: $e. Contenido: "$dataField". Se usará el mensaje externo.');
         }
+      } else if (dataField != null) {
+         print('$operation API WARNING: El campo "Data" NO es un Mapa ni un String JSON válido. Tipo actual: ${dataField.runtimeType}. Se usará el mensaje externo.');
       } else {
-        print('$operation API Error: El campo "Data" NO es un Mapa ni un String JSON válido. Tipo actual: ${dataField.runtimeType}');
-        return {'success': false, 'message': 'Respuesta del servidor con formato de datos interno inesperado.'};
+        print('$operation - El campo "Data" es nulo. Se usará el mensaje externo.');
       }
 
-      // Para el payload interno (AuthResponseDto), esperamos claves camelCase ('success', 'message')
-      bool apiInnerSuccess = actualDataPayload?['success'] as bool? ?? false; 
-      String apiInnerMessage = actualDataPayload?['message'] as String? ?? apiOuterMessage; // Fallback al mensaje externo
+      // Si tenemos un payload interno (actualDataPayload), intentamos extraer información.
+      if (actualDataPayload != null) {
+        token = actualDataPayload['token'] as String?;
+        hunterData = actualDataPayload['hunter'];
 
-      print('$operation - apiInnerSuccess (actualDataPayload["success"]): $apiInnerSuccess');
-      print('$operation - apiInnerMessage (actualDataPayload["message"] o fallback a apiOuterMessage): "$apiInnerMessage"');
+        // Opcional: si el mensaje interno es más específico para el éxito Y la operación externa fue exitosa.
+        String? apiInnerMessage = actualDataPayload['message'] as String?;
+        if (apiInnerMessage != null && apiInnerMessage.isNotEmpty) {
+          // Podrías decidir usar el mensaje interno si es más relevante para el éxito.
+          // Por ejemplo, si el outer message es genérico como "Operación exitosa"
+          // y el inner message es "Token generado y perfil cargado".
+          // Para este caso, el `apiOuterMessage` ya parece ser el mensaje de éxito deseado ("Welcome back...").
+          // successMessageToShow = apiInnerMessage; // Descomentar si prefieres el mensaje interno en caso de éxito.
+        }
+         print('$operation - apiInnerMessage (del actualDataPayload): "$apiInnerMessage"');
+      }
+        
+      if (token != null) {
+        try {
+          await _storage.write(key: 'jwt_token', value: token);
+          print('ApiService ($operation): Token guardado.');
+        } catch (storageError) {
+          print('ApiService ($operation): ÉXITO API, PERO FALLÓ AL GUARDAR TOKEN. Error: $storageError.');
+          // Considera si esto debería convertir la operación en un fallo para la UI.
+          // Por ahora, se mantiene como éxito ya que el login/registro en sí fue exitoso.
+        }
+      } else {
+        print('ApiService ($operation): Éxito API, no se encontró token en actualDataPayload.');
+      }
       
-      bool finalCombinedSuccess = httpSuccess && apiOuterSuccess && apiInnerSuccess;
-      print('$operation - finalCombinedSuccess (httpSuccess && apiOuterSuccess && apiInnerSuccess): $finalCombinedSuccess');
+      Map<String, dynamic> successResult = {
+        'success': true, // <--- ESTA ES LA CLAVE PARA EL COLOR VERDE
+        'message': successMessageToShow, 
+        'token': token,
+        'hunter': hunterData
+      };
+      print('--- FIN _handleApiResponse (ÉXITO LÓGICO DEFINIDO POR HTTP Y API EXTERNA): $successResult ---');
+      return successResult;
 
-      if (finalCombinedSuccess) {
-        String? token = actualDataPayload?['token'] as String?;
-        var hunterData = actualDataPayload?['hunter'];
-        
-        if (token != null) {
-          try {
-            await _storage.write(key: 'jwt_token', value: token);
-            print('ApiService ($operation): Token guardado.');
-          } catch (storageError) {
-            print('ApiService ($operation): ÉXITO API, PERO FALLÓ AL GUARDAR TOKEN. Error: $storageError.');
-          }
-        } else {
-          print('ApiService ($operation): Éxito API, no se encontró token en actualDataPayload.');
-        }
-        
-        Map<String, dynamic> successResult = {
-          'success': true,
-          'message': apiInnerMessage, 
-          'token': token,
-          'hunter': hunterData
-        };
-        print('--- FIN _handleApiResponse (ÉXITO LÓGICO): $successResult ---');
-        return successResult;
-
-      } else {
-        String finalErrorMessage = apiOuterMessage; 
-        if (apiOuterSuccess && !apiInnerSuccess && (actualDataPayload?['message'] is String)) {
-            finalErrorMessage = actualDataPayload!['message'];
-        }
-        
-        Map<String, dynamic> failureResult = {'success': false, 'message': finalErrorMessage};
-        print('ApiService ($operation): Fallo LÓGICO. StatusCode: ${response.statusCode}. OuterSuccess: $apiOuterSuccess. InnerSuccess: $apiInnerSuccess. Retornando: $failureResult');
-        print('--- FIN _handleApiResponse (FALLO LÓGICO) para: $operation ---');
-        return failureResult;
-      }
     } catch (e, s) { 
       print('$operation API Error: Excepción INESPERADA dentro de _handleApiResponse (después del parseo inicial). Error: $e');
       print('$operation API StackTrace: $s');
