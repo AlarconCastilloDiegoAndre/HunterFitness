@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import 'registration_screen.dart'; // Importa la nueva pantalla de registro
+import 'registration_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,39 +16,47 @@ class _LoginScreenState extends State<LoginScreen> {
   final ApiService _apiService = ApiService();
 
   bool _isLoading = false;
-  String _message = '';
+  String _uiMessage = '';
+  bool _isOperationError = false;
 
   Future<void> _login() async {
-    if (_formKey.currentState!.validate()) {
+    if (_formKey.currentState?.validate() ?? false) {
       setState(() {
         _isLoading = true;
-        _message = '';
+        _uiMessage = '';
+        _isOperationError = false;
       });
 
       final result = await _apiService.login(
-        _usernameController.text,
+        _usernameController.text.trim(),
         _passwordController.text,
       );
 
+      print('LoginScreen - RESULTADO CRUDO de ApiService: $result');
+
+      bool successFromApiService = result['success'] as bool? ?? false;
+      String messageFromApiService = result['message'] as String? ?? 'Ocurrió un error desconocido.';
+      
+      print('LoginScreen - successFromApiService: $successFromApiService');
+      print('LoginScreen - messageFromApiService: "$messageFromApiService"');
+
       setState(() {
         _isLoading = false;
-        _message = result['message'] ?? 'Ocurrió un error desconocido.';
+        _uiMessage = messageFromApiService;
+        _isOperationError = !successFromApiService;
       });
 
-      if (result['success'] == true) {
-        print('Login successful! Token: ${result['token']}');
-        print('Hunter data: ${result['hunter']}');
-        // Aquí puedes navegar a otra pantalla, por ejemplo, un Dashboard.
-        // Navigator.pushReplacement(
-        //   context,
-        //   MaterialPageRoute(builder: (context) => HomeScreen(hunterData: result['hunter'])),
-        // );
-         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('¡Login Exitoso! Bienvenido ${result['hunter']?['hunterName'] ?? ''}'), backgroundColor: Colors.green),
+      if (successFromApiService) {
+        print('LoginScreen: Operación Exitosa! Mensaje: "$messageFromApiService"');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(messageFromApiService), backgroundColor: Colors.green),
         );
+        // Aquí puedes navegar a otra pantalla (ej. HomeScreen)
+        // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeScreen(hunter: result['hunter'])));
       } else {
-         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error de Login: $_message'), backgroundColor: Colors.redAccent),
+        print('LoginScreen: Operación Fallida. Mensaje: "$messageFromApiService"');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_uiMessage), backgroundColor: Colors.redAccent),
         );
       }
     }
@@ -96,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   style: const TextStyle(color: Colors.white),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
+                    if (value == null || value.trim().isEmpty) {
                       return 'Por favor ingresa tu usuario o email';
                     }
                     return null;
@@ -126,23 +134,25 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _login,
                         child: const Text('ACCEDER'),
                       ),
-                const SizedBox(height: 10), // Espacio reducido
-                // Mensaje de error (solo si no es exitoso y no está cargando)
-                if (_message.isNotEmpty && !_isLoading && !(_message.toLowerCase().contains('exitoso') || _message.toLowerCase().contains('successful')))
+                const SizedBox(height: 10),
+                if (_uiMessage.isNotEmpty && !_isLoading)
                   Padding(
                     padding: const EdgeInsets.only(top:10.0, bottom: 10.0),
                     child: Text(
-                      _message,
+                      _uiMessage,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.redAccent,
+                      style: TextStyle(
+                        color: _isOperationError ? Colors.redAccent : Colors.green,
                         fontSize: 14,
                       ),
                     ),
                   ),
-                // Botón para ir a la pantalla de Registro
                 TextButton(
                   onPressed: () {
+                    setState(() {
+                      _uiMessage = '';
+                      _isOperationError = false;
+                    });
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const RegistrationScreen()),
