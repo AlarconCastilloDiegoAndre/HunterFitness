@@ -19,67 +19,75 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   bool _isLoading = false;
   String _uiMessage = '';
-  bool _isOperationError = false;
+  bool? _messageIsErrorType; // null, true (error), false (éxito)
 
   Future<void> _register() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      if (_passwordController.text != _confirmPasswordController.text) {
-        setState(() {
-          _isLoading = false;
-          _uiMessage = 'Las contraseñas no coinciden.';
-          _isOperationError = true;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Las contraseñas no coinciden.'), backgroundColor: Colors.orangeAccent),
-        );
-        return;
-      }
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
 
+    if (_passwordController.text != _confirmPasswordController.text) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false; // Asegurarse que no esté cargando
+          _uiMessage = 'Las contraseñas no coinciden.';
+          _messageIsErrorType = true; // Es un error de validación
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
       setState(() {
         _isLoading = true;
         _uiMessage = '';
-        _isOperationError = false;
+        _messageIsErrorType = null;
       });
+    }
 
-      final result = await _apiService.registerUser(
-        username: _usernameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        hunterName: _hunterNameController.text.trim(),
-      );
-      
-      print('RegistrationScreen - RESULTADO CRUDO de ApiService: $result');
+    final result = await _apiService.registerUser(
+      username: _usernameController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      hunterName: _hunterNameController.text.trim(),
+    );
+    
+    print('RegistrationScreen - RESULTADO CRUDO de ApiService: $result');
+    if (!mounted) return;
 
-      bool successFromApiService = result['success'] as bool? ?? false;
-      String messageFromApiService = result['message'] as String? ?? 'Ocurrió un error desconocido.';
+    bool successFromApiService = result['success'] as bool? ?? false;
+    String messageFromApiService = result['message'] as String? ?? 'Ocurrió un error desconocido.';
 
-      print('RegistrationScreen - successFromApiService: $successFromApiService');
-      print('RegistrationScreen - messageFromApiService: "$messageFromApiService"');
-      
+    print('RegistrationScreen - successFromApiService: $successFromApiService');
+    print('RegistrationScreen - messageFromApiService: "$messageFromApiService"');
+    
+    if (mounted) {
       setState(() {
         _isLoading = false;
         _uiMessage = messageFromApiService;
-        _isOperationError = !successFromApiService;
+        _messageIsErrorType = !successFromApiService;
       });
+    }
 
-      if (successFromApiService) {
-        print('RegistrationScreen: Operación Exitosa! Mensaje: "$messageFromApiService"');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(messageFromApiService), backgroundColor: Colors.green),
-        );
-        if (mounted) {
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) {
-              Navigator.pop(context); 
-            }
-          });
-        }
-      } else {
-        print('RegistrationScreen: Operación Fallida. Mensaje: "$messageFromApiService"');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_uiMessage), backgroundColor: Colors.redAccent),
-        );
+    if (successFromApiService) {
+      print('RegistrationScreen: Operación Exitosa! Mensaje: "$messageFromApiService"');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(messageFromApiService),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      if (mounted) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            Navigator.pop(context); 
+          }
+        });
       }
+    } else {
+      print('RegistrationScreen: Operación Fallida. Mensaje: "$messageFromApiService"');
+      // El mensaje de error ya se muestra en el widget Text
     }
   }
 
@@ -95,6 +103,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('RegistrationScreen build (inicio): _uiMessage="$_uiMessage", _messageIsErrorType=$_messageIsErrorType, _isLoading=$_isLoading');
+
+    Color messageColor = Colors.transparent;
+    if (_messageIsErrorType != null) {
+      messageColor = _messageIsErrorType! ? Colors.redAccent : Colors.green;
+    }
+    print('RegistrationScreen build - Text Color elegido: $messageColor');
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Hunter Fitness - Registro'),
@@ -189,13 +205,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       _uiMessage,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: _isOperationError ? Colors.redAccent : Colors.green,
+                        color: messageColor, // Usar el color determinado al inicio del build
                         fontSize: 14,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 TextButton(
                   onPressed: () {
+                    if(mounted) {
+                      setState(() {
+                        _uiMessage = '';
+                        _messageIsErrorType = null;
+                      });
+                    }
                     Navigator.pop(context); 
                   },
                   child: Text('¿Ya tienes cuenta? Inicia Sesión', style: TextStyle(color: Colors.blueAccent[100])),

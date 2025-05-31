@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'registration_screen.dart';
+// import 'home_screen.dart'; // Descomenta si tienes una HomeScreen
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,48 +18,69 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   String _uiMessage = '';
-  bool _isOperationError = false;
+  // Para el color del mensaje: true si es un error, false si es éxito.
+  // Se inicializa como null para que no se muestre nada hasta la primera operación.
+  bool? _messageIsErrorType;
 
   Future<void> _login() async {
-    if (_formKey.currentState?.validate() ?? false) {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return; // No hacer nada si el formulario no es válido
+    }
+
+    // Iniciar operación
+    if (mounted) {
       setState(() {
         _isLoading = true;
-        _uiMessage = '';
-        _isOperationError = false;
+        _uiMessage = ''; // Limpiar mensaje anterior
+        _messageIsErrorType = null; // Resetear el tipo de mensaje
       });
+    }
 
-      final result = await _apiService.login(
-        _usernameController.text.trim(),
-        _passwordController.text,
-      );
+    final result = await _apiService.login(
+      _usernameController.text.trim(),
+      _passwordController.text,
+    );
 
-      print('LoginScreen - RESULTADO CRUDO de ApiService: $result');
+    print('LoginScreen - RESULTADO CRUDO de ApiService: $result');
+    if (!mounted) return; // Verificar si el widget sigue montado
 
-      bool successFromApiService = result['success'] as bool? ?? false;
-      String messageFromApiService = result['message'] as String? ?? 'Ocurrió un error desconocido.';
-      
-      print('LoginScreen - successFromApiService: $successFromApiService');
-      print('LoginScreen - messageFromApiService: "$messageFromApiService"');
+    bool successFromApiService = result['success'] as bool? ?? false;
+    String messageFromApiService = result['message'] as String? ?? 'Ocurrió un error desconocido.';
+    
+    print('LoginScreen - successFromApiService: $successFromApiService');
+    print('LoginScreen - messageFromApiService: "$messageFromApiService"');
 
+    // Actualizar UI después de la operación
+    if (mounted) {
       setState(() {
         _isLoading = false;
         _uiMessage = messageFromApiService;
-        _isOperationError = !successFromApiService;
+        _messageIsErrorType = !successFromApiService; // Si NO es success, entonces es un error
       });
+    }
 
-      if (successFromApiService) {
-        print('LoginScreen: Operación Exitosa! Mensaje: "$messageFromApiService"');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(messageFromApiService), backgroundColor: Colors.green),
-        );
-        // Aquí puedes navegar a otra pantalla (ej. HomeScreen)
-        // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeScreen(hunter: result['hunter'])));
-      } else {
-        print('LoginScreen: Operación Fallida. Mensaje: "$messageFromApiService"');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_uiMessage), backgroundColor: Colors.redAccent),
-        );
-      }
+    if (successFromApiService) {
+      print('LoginScreen: Operación Exitosa! Mensaje: "$messageFromApiService"');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(messageFromApiService),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      // NAVEGACIÓN (descomentar y ajustar cuando tengas HomeScreen)
+      // Future.delayed(const Duration(seconds: 1), () {
+      //   if (mounted) {
+      //     // Navigator.pushReplacement(
+      //     //   context,
+      //     //   MaterialPageRoute(builder: (context) => HomeScreen(hunterData: result['hunter'])),
+      //     // );
+      //     print("Navegación a HomeScreen debería ocurrir aquí.");
+      //   }
+      // });
+    } else {
+      print('LoginScreen: Operación Fallida. Mensaje: "$messageFromApiService"');
+      // El mensaje de error ya se muestra en el widget Text
     }
   }
 
@@ -71,6 +93,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('LoginScreen build (inicio): _uiMessage="$_uiMessage", _messageIsErrorType=$_messageIsErrorType, _isLoading=$_isLoading');
+
+    Color messageColor = Colors.transparent; // Color por defecto (invisible)
+    if (_messageIsErrorType != null) { // Solo asignar color si hay un mensaje que mostrar
+      messageColor = _messageIsErrorType! ? Colors.redAccent : Colors.green;
+    }
+    print('LoginScreen build - Text Color elegido: $messageColor');
+
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Hunter Fitness - Login'),
@@ -142,17 +173,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       _uiMessage,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: _isOperationError ? Colors.redAccent : Colors.green,
+                        color: messageColor, // Usar el color determinado al inicio del build
                         fontSize: 14,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 TextButton(
                   onPressed: () {
-                    setState(() {
-                      _uiMessage = '';
-                      _isOperationError = false;
-                    });
+                    if(mounted) {
+                      setState(() {
+                        _uiMessage = '';
+                        _messageIsErrorType = null; // Resetear para que no muestre nada
+                      });
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const RegistrationScreen()),
