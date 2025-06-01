@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import 'home_screen.dart'; // Asegúrate que esta importación sea correcta
-// import 'login_screen.dart'; // Ya no es necesario si navega directamente a home
+import 'home_screen.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -21,13 +20,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   bool _isLoading = false;
   String _uiMessage = '';
-  bool? _messageIsErrorType;
+  bool _messageIsErrorType = false;
 
   Future<void> _register() async {
     if (!(_formKey.currentState?.validate() ?? false)) {
        setState(() {
-        _uiMessage = '';
-        _messageIsErrorType = null;
+        _uiMessage = ''; // Limpiar mensaje si la validación del formulario falla
       });
       return;
     }
@@ -36,7 +34,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _uiMessage = '[ERROR SISTEMA] Las claves de acceso no coinciden.';
+          _uiMessage = '[ERROR UI] Las claves de acceso no coinciden.';
           _messageIsErrorType = true;
         });
       }
@@ -46,12 +44,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (mounted) {
       setState(() {
         _isLoading = true;
-        _uiMessage = '[SISTEMA] Iniciando protocolo de registro...';
-        _messageIsErrorType = null;
+        _uiMessage = '[SISTEMA] Creando licencia de Cazador...';
+        _messageIsErrorType = false;
       });
     }
 
-    final result = await _apiService.registerUser(
+    final Map<String, dynamic> resultFromService = await _apiService.registerUser(
       username: _usernameController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
@@ -60,47 +58,102 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     
     if (!mounted) return;
 
-    bool successFromApiService = result['success'] as bool? ?? false;
-    String messageFromApiService = result['message'] as String? ?? '[SISTEMA] Fallo en la comunicación con la interfaz.';
+    print('RegistrationScreen DEBUG: resultFromService COMPLETO: $resultFromService');
+
+    bool successFromApiService = resultFromService['success'] as bool? ?? false;
+    String messageFromApiService = resultFromService['message'] as String? ?? '[SISTEMA] Respuesta no clara de la API.';
     
+    Map<String, dynamic>? finalExtractedHunterProfile;
+
+    // Lógica de extracción robusta (priorizando 'Data' luego 'data')
+    Map<String, dynamic>? topLevelDataField;
+    if (resultFromService.containsKey('Data') && resultFromService['Data'] is Map<String, dynamic>) {
+        topLevelDataField = resultFromService['Data'] as Map<String, dynamic>;
+        print('RegistrationScreen DEBUG: Clave "Data" (PascalCase) encontrada y es Map. Keys: ${topLevelDataField.keys}');
+    } else if (resultFromService.containsKey('data') && resultFromService['data'] is Map<String, dynamic>) {
+        topLevelDataField = resultFromService['data'] as Map<String, dynamic>;
+        print('RegistrationScreen DEBUG: Clave "data" (camelCase) encontrada y es Map (fallback). Keys: ${topLevelDataField.keys}');
+    }
+
+    if (topLevelDataField != null) {
+      print('RegistrationScreen DEBUG: topLevelDataField (Data o data) encontrado. Keys: ${topLevelDataField.keys}');
+      dynamic hunterFromData = topLevelDataField['hunter']; 
+
+      if (hunterFromData != null) { 
+        print('RegistrationScreen DEBUG: hunterFromData (topLevelDataField["hunter"]) NO es null. Intentando casteo. Contenido: $hunterFromData, Tipo: ${hunterFromData.runtimeType}');
+        try {
+          finalExtractedHunterProfile = Map<String, dynamic>.from(hunterFromData as Map); 
+          print('RegistrationScreen DEBUG: Perfil extraído de topLevelDataField["hunter"] y casteado: $finalExtractedHunterProfile');
+        } catch (e) {
+          print('RegistrationScreen DEBUG: Error al castear hunter desde topLevelDataField["hunter"]: $e. Contenido de hunterFromData: $hunterFromData');
+          finalExtractedHunterProfile = null;
+        }
+      } else {
+        print('RegistrationScreen DEBUG: "hunter" es null dentro de topLevelDataField.');
+      }
+    } else {
+      print('RegistrationScreen DEBUG: Ni "Data" ni "data" se encontraron como Map en resultFromService.');
+      // Fallback a directHunterObjectFromService si se mantiene en ApiService
+      dynamic directHunterFallback = resultFromService['directHunterObjectFromService'];
+      if (directHunterFallback != null && directHunterFallback is Map) {
+        try {
+          finalExtractedHunterProfile = Map<String, dynamic>.from(directHunterFallback);
+          print('RegistrationScreen DEBUG: Perfil extraído de "directHunterObjectFromService" (fallback) y casteado: $finalExtractedHunterProfile');
+        } catch (e) {
+          print('RegistrationScreen DEBUG: Error al castear hunter desde directHunterObjectFromService: $e');
+        }
+      } else {
+        print('RegistrationScreen DEBUG: Fallback a "directHunterObjectFromService" también falló (null o no Map).');
+      }
+    }
+            
+    print('RegistrationScreen DEBUG: Tipo de finalExtractedHunterProfile (después de todo): ${finalExtractedHunterProfile?.runtimeType}');
+    print('RegistrationScreen DEBUG: Contenido de finalExtractedHunterProfile (después de todo): $finalExtractedHunterProfile');
+
     if (mounted) {
       setState(() {
         _isLoading = false;
-        _uiMessage = successFromApiService
-            ? '[SISTEMA] ${messageFromApiService}'
-            : '[ERROR SISTEMA] ${messageFromApiService}';
+        _uiMessage = messageFromApiService;
         _messageIsErrorType = !successFromApiService;
       });
     }
 
     if (successFromApiService) {
-      final hunterData = result['hunter']; // Accedemos a 'hunter' directamente
-      if (hunterData != null && hunterData is Map<String, dynamic> && mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _uiMessage,
-              style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+      if (finalExtractedHunterProfile != null) { 
+        print('RegistrationScreen DEBUG: finalExtractedHunterProfile NO es null. PREPARANDO NAVEGACIÓN...');
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(messageFromApiService, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.lightBlueAccent,
+              duration: const Duration(seconds: 2),
             ),
-            backgroundColor: Colors.lightBlueAccent,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HomeScreen(hunterProfileData: hunterData),
-          ),
-          (Route<dynamic> route) => false,
-        );
+          );
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HomeScreen(hunterProfileData: finalExtractedHunterProfile!),
+                ),
+                (Route<dynamic> route) => false,
+              );
+            }
+          });
+        }
+        return; 
       } else {
+         print('RegistrationScreen DEBUG: Registro API exitoso, pero finalExtractedHunterProfile es null.');
          if (mounted) {
             setState(() {
-              _uiMessage = '[ERROR SISTEMA] No se pudieron cargar los datos del nuevo cazador.';
+              _uiMessage = '[ERROR UI] Registro exitoso pero los datos del cazador están ausentes o corruptos.';
               _messageIsErrorType = true;
             });
          }
       }
+    } else {
+        print('RegistrationScreen DEBUG: successFromApiService fue false.');
     }
   }
 
@@ -117,13 +170,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     Color messageColor = Colors.grey;
-    if (_messageIsErrorType != null) {
-      messageColor = _messageIsErrorType!
-          ? const Color(0xFFFF6666) 
-          : Colors.lightBlueAccent; 
-    }
-     if (_isLoading && _messageIsErrorType == null) {
+    if (_messageIsErrorType) {
+      messageColor = const Color(0xFFFF6666);
+    } else if (_isLoading) {
       messageColor = Colors.yellowAccent;
+    } else if (_uiMessage.isNotEmpty && !_messageIsErrorType) {
+      messageColor = Colors.lightBlueAccent;
     }
 
     final Color appBarTextColor = Colors.lightBlueAccent;
@@ -250,6 +302,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                           Text(
                             _uiMessage,
                             style: TextStyle(color: messageColor, fontWeight: FontWeight.bold, fontSize: 14),
+                            textAlign: TextAlign.center,
                           )
                         ],
                       ))
@@ -286,7 +339,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                      if(mounted) {
                       setState(() {
                         _uiMessage = '';
-                        _messageIsErrorType = null;
                       });
                     }
                     Navigator.pop(context); 

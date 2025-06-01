@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'registration_screen.dart';
-import 'home_screen.dart'; // Asegúrate que esta importación sea correcta
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,13 +18,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   String _uiMessage = '';
-  bool? _messageIsErrorType;
+  bool _messageIsErrorType = false; 
 
   Future<void> _login() async {
     if (!(_formKey.currentState?.validate() ?? false)) {
       setState(() {
-        _uiMessage = ''; 
-        _messageIsErrorType = null;
+        _uiMessage = '';
       });
       return;
     }
@@ -32,58 +31,100 @@ class _LoginScreenState extends State<LoginScreen> {
     if (mounted) {
       setState(() {
         _isLoading = true;
-        _uiMessage = '[SISTEMA] Iniciando protocolo de acceso...';
-        _messageIsErrorType = null;
+        _uiMessage = '[SISTEMA] Verificando credenciales...';
+        _messageIsErrorType = false;
       });
     }
 
-    final result = await _apiService.login(
+    final Map<String, dynamic> resultFromService = await _apiService.login(
       _usernameController.text.trim(),
       _passwordController.text,
     );
 
     if (!mounted) return;
 
-    bool successFromApiService = result['success'] as bool? ?? false;
-    String messageFromApiService = result['message'] as String? ?? '[SISTEMA] Error de conexión con la interfaz.';
+    print('LoginScreen DEBUG: resultFromService COMPLETO: $resultFromService');
+
+    bool successFromApiService = resultFromService['success'] as bool? ?? false;
+    String messageFromApiService = resultFromService['message'] as String? ?? '[SISTEMA] Respuesta no clara de la API.';
+    
+    Map<String, dynamic>? finalExtractedHunterProfile; 
+
+    Map<String, dynamic>? topLevelDataField = resultFromService['data'] as Map<String, dynamic>? ?? resultFromService['Data'] as Map<String, dynamic>?;
+
+    if (topLevelDataField != null) {
+      print('LoginScreen DEBUG: topLevelDataField (data o Data) encontrado. Keys: ${topLevelDataField.keys}');
+      dynamic hunterFromData = topLevelDataField['hunter']; // Obtener como dynamic primero
+
+      // **** SIMPLIFICACIÓN DE LA CONDICIÓN ****
+      // Si hunterFromData no es null, intentamos el casteo.
+      // El try-catch manejará si no es un Map compatible.
+      if (hunterFromData != null) { 
+        print('LoginScreen DEBUG: hunterFromData (topLevelDataField["hunter"]) NO es null. Intentando casteo. Contenido: $hunterFromData, Tipo: ${hunterFromData.runtimeType}');
+        try {
+          finalExtractedHunterProfile = Map<String, dynamic>.from(hunterFromData as Map); // Casteo explícito a Map aquí
+          print('LoginScreen DEBUG: Perfil del cazador extraído y casteado de topLevelDataField["hunter"]: $finalExtractedHunterProfile');
+        } catch (e) {
+          print('LoginScreen DEBUG: Error al castear hunter desde topLevelDataField["hunter"]: $e. Contenido de hunterFromData: $hunterFromData');
+          finalExtractedHunterProfile = null;
+        }
+      } else {
+        print('LoginScreen DEBUG: "hunter" es null dentro de topLevelDataField.');
+      }
+    } else {
+      print('LoginScreen DEBUG: Ni "data" ni "Data" se encontraron como Map en resultFromService.');
+      // No hay necesidad de fallback a 'directHunterObjectFromService' si ApiService no lo puebla consistentemente.
+    }
+            
+    print('LoginScreen DEBUG: Tipo de finalExtractedHunterProfile (después de todo): ${finalExtractedHunterProfile?.runtimeType}');
+    print('LoginScreen DEBUG: Contenido de finalExtractedHunterProfile (después de todo): $finalExtractedHunterProfile');
 
     if (mounted) {
       setState(() {
         _isLoading = false;
-        _uiMessage = successFromApiService
-            ? '[SISTEMA] ${messageFromApiService}'
-            : '[ERROR SISTEMA] ${messageFromApiService}';
+        _uiMessage = messageFromApiService; 
         _messageIsErrorType = !successFromApiService;
       });
     }
 
     if (successFromApiService) {
-      final hunterData = result['hunter']; // Accedemos a 'hunter' directamente
-      if (hunterData != null && hunterData is Map<String, dynamic> && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _uiMessage,
-              style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
-            ),
-            backgroundColor: Colors.lightBlueAccent,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HomeScreen(hunterProfileData: hunterData),
-          ),
-        );
-      } else {
+      if (finalExtractedHunterProfile != null) { 
+        print('LoginScreen DEBUG: finalExtractedHunterProfile NO es null. PREPARANDO NAVEGACIÓN...');
+        
         if (mounted) {
-          setState(() {
-            _uiMessage = '[ERROR SISTEMA] Datos del cazador no válidos o ausentes.';
-            _messageIsErrorType = true;
+           ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                messageFromApiService, 
+                style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: Colors.lightBlueAccent,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HomeScreen(hunterProfileData: finalExtractedHunterProfile!),
+                ),
+              );
+            }
           });
         }
+        return; 
+      } else {
+        print('LoginScreen DEBUG: finalExtractedHunterProfile es null. Se mostrará error en UI.');
+        if (mounted) {
+            setState(() {
+              _uiMessage = '[ERROR UI] Login exitoso pero los datos del cazador están ausentes o corruptos.';
+              _messageIsErrorType = true;
+            });
+          }
       }
+    } else {
+      print('LoginScreen DEBUG: successFromApiService fue false.');
     }
   }
 
@@ -97,13 +138,12 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     Color messageColor = Colors.grey;
-    if (_messageIsErrorType != null) {
-      messageColor = _messageIsErrorType!
-          ? const Color(0xFFFF6666) 
-          : Colors.lightBlueAccent; 
-    }
-    if (_isLoading && _messageIsErrorType == null) {
-      messageColor = Colors.yellowAccent; 
+    if (_messageIsErrorType) {
+      messageColor = const Color(0xFFFF6666);
+    } else if (_isLoading) {
+      messageColor = Colors.yellowAccent;
+    } else if (_uiMessage.isNotEmpty && !_messageIsErrorType) {
+      messageColor = Colors.lightBlueAccent;
     }
 
     final Color primaryTextColor = Colors.lightBlueAccent;
@@ -232,6 +272,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Text(
                             _uiMessage,
                             style: TextStyle(color: messageColor, fontWeight: FontWeight.bold, fontSize: 14),
+                            textAlign: TextAlign.center,
                           )
                         ],
                       ))
@@ -268,7 +309,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (mounted) {
                       setState(() {
                         _uiMessage = '';
-                        _messageIsErrorType = null;
                       });
                     }
                     Navigator.push(
