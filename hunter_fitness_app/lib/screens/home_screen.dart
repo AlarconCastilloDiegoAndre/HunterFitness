@@ -15,7 +15,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final ApiService _apiService = ApiService();
 
   Map<String, dynamic>? _hunterProfile;
-  List<dynamic> _dailyQuests = []; // Inicializar como lista vacía
+  List<dynamic> _dailyQuests = [];
   bool _isLoadingQuests = true;
   String? _questsErrorMessage;
 
@@ -35,34 +35,53 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     try {
       final questsResult = await _apiService.getDailyQuests();
-      print("HomeScreen - _loadDailyQuests - Result: $questsResult");
+      print("HomeScreen - _loadDailyQuests - API Result: $questsResult");
 
-      if (questsResult['success'] == true && questsResult['data'] != null) {
-        final Map<String, dynamic> summaryDto = questsResult['data'];
-        if (mounted) {
-          setState(() {
-            // El DTO DailyQuestsSummaryDto tiene una lista llamada "quests"
-            _dailyQuests = summaryDto['quests'] as List<dynamic>? ?? [];
-            _isLoadingQuests = false;
-            if (_dailyQuests.isEmpty) {
-              _questsErrorMessage = '[SISTEMA] No hay misiones diarias asignadas para hoy.';
-            }
-          });
+      if (questsResult['success'] == true) {
+        // El DTO DailyQuestsSummaryDto completo ahora está en questsResult['data']
+        final Map<String, dynamic>? summaryData = questsResult['data'] as Map<String, dynamic>?;
+        
+        if (summaryData != null && summaryData['quests'] is List) {
+          if (mounted) {
+            setState(() {
+              _dailyQuests = summaryData['quests'] as List<dynamic>;
+              _isLoadingQuests = false;
+              if (_dailyQuests.isEmpty) {
+                _questsErrorMessage = '[SISTEMA] No hay misiones diarias asignadas para hoy.';
+                 print("HomeScreen - _loadDailyQuests: No quests found in summaryData.");
+              } else {
+                print("HomeScreen - _loadDailyQuests: Quests loaded: ${_dailyQuests.length}");
+              }
+            });
+          }
+        } else {
+           print("HomeScreen - _loadDailyQuests: 'quests' field is missing or not a list in summaryData. summaryData: $summaryData");
+          if (mounted) {
+            setState(() {
+              _questsErrorMessage = '[SISTEMA] Formato de misiones inesperado.';
+              _isLoadingQuests = false;
+              _dailyQuests = []; // Asegurar que sea una lista vacía
+            });
+          }
         }
       } else {
         if (mounted) {
           setState(() {
-            _questsErrorMessage = questsResult['message'] ?? '[ERROR SISTEMA] Error desconocido al cargar misiones.';
+            _questsErrorMessage = questsResult['message'] ?? '[ERROR SISTEMA] Error al cargar misiones.';
             _isLoadingQuests = false;
+            _dailyQuests = []; // Asegurar que sea una lista vacía
           });
+           print("HomeScreen - _loadDailyQuests: API call was not successful. Message: ${questsResult['message']}");
         }
       }
-    } catch (e) {
+    } catch (e, s) {
       print("HomeScreen - _loadDailyQuests - Catch Error: $e");
+      print("HomeScreen - _loadDailyQuests - StackTrace: $s");
       if (mounted) {
         setState(() {
-          _questsErrorMessage = "[ERROR SISTEMA] Fallo al cargar misiones: ${e.toString()}";
+          _questsErrorMessage = "[ERROR SISTEMA] Fallo crítico al cargar misiones diarias.";
           _isLoadingQuests = false;
+          _dailyQuests = []; // Asegurar que sea una lista vacía
         });
       }
     }
@@ -85,7 +104,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final int currentXP = _hunterProfile?['currentXP'] ?? 0;
     final int xpForNextLevel = _hunterProfile?['xpRequiredForNextLevel'] ?? 100;
     final String rank = _hunterProfile?['hunterRank'] ?? 'E';
-    final double xpProgress = (xpForNextLevel > 0 && currentXP <= xpForNextLevel) ? (currentXP.toDouble() / xpForNextLevel.toDouble()) : 0.0;
+    final double xpProgress = (xpForNextLevel > 0 && currentXP >=0 && currentXP <= xpForNextLevel) 
+                             ? (currentXP.toDouble() / xpForNextLevel.toDouble()) 
+                             : (currentXP > xpForNextLevel ? 1.0 : 0.0);
+
 
     final int strength = _hunterProfile?['strength'] ?? 10;
     final int agility = _hunterProfile?['agility'] ?? 10;
@@ -205,7 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Text('XP: $currentXP / $xpToNext', style: TextStyle(fontSize: 13, color: Colors.grey[400])),
             const SizedBox(height: 5),
             LinearProgressIndicator(
-              value: xpProgress,
+              value: xpProgress.isNaN || xpProgress.isInfinite ? 0.0 : xpProgress,
               backgroundColor: Colors.blueGrey[700]?.withOpacity(0.5),
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.lightBlueAccent),
               minHeight: 10,
@@ -224,38 +246,38 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent))),
       );
     }
-    if (_questsErrorMessage != null && _dailyQuests.isEmpty) { // Mostrar error solo si no hay quests y hay mensaje
+    if (_questsErrorMessage != null && _dailyQuests.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 15.0),
         child: Center(child: Text(_questsErrorMessage!, style: const TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.bold))),
       );
     }
-    if (_dailyQuests.isEmpty) {
+    if (_dailyQuests.isEmpty) { // Esto ahora solo se muestra si no hay error y la lista está vacía
          return const Padding(
             padding: EdgeInsets.symmetric(vertical: 15.0),
-            child: Center(child: Text('[SISTEMA] No hay misiones diarias asignadas.', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic))),
+            child: Center(child: Text('[SISTEMA] No hay misiones diarias asignadas para hoy.', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic))),
          );
     }
 
     return Column(
       children: _dailyQuests.map((questData) {
-        // Asumimos que questData es un Map<String, dynamic>
-        final String questName = questData['questName'] ?? 'Misión Desconocida';
-        final num currentProgNum = questData['progress'] ?? 0; // Viene como decimal 0-100
-        final double progressFraction = currentProgNum.toDouble() / 100.0;
+        final Map<String, dynamic> quest = questData as Map<String, dynamic>;
+        final String questName = quest['questName'] ?? 'Misión Desconocida';
+        final num currentProgNum = quest['progress'] ?? 0;
+        final double progressFraction = (currentProgNum.toDouble() / 100.0).clamp(0.0, 1.0);
         
-        final String status = questData['status'] ?? 'Desconocido';
-        final String targetDesc = questData['targetDescription'] ?? 'Completar la tarea asignada';
+        final String status = quest['status'] ?? 'Desconocido';
+        final String targetDesc = quest['targetDescription'] ?? 'Completar la tarea asignada';
 
         Color statusColor = Colors.grey[600]!;
-        IconData statusIcon = Icons.radio_button_unchecked_outlined; // Cambiado a outlined
+        IconData statusIcon = Icons.radio_button_unchecked_outlined;
 
         if (status == 'Completed') {
-          statusColor = Colors.greenAccent.shade400; // Un verde más visible
-          statusIcon = Icons.check_circle_outline; // Cambiado a outlined
+          statusColor = Colors.greenAccent.shade400;
+          statusIcon = Icons.check_circle_outline;
         } else if (status == 'InProgress') {
-          statusColor = Colors.yellowAccent.shade400; // Un amarillo más visible
-          statusIcon = Icons.hourglass_bottom_outlined; // Cambiado a outlined
+          statusColor = Colors.yellowAccent.shade400;
+          statusIcon = Icons.hourglass_empty_outlined;
         }
         
         return Card(
@@ -364,7 +386,6 @@ class _HomeScreenState extends State<HomeScreen> {
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.blueGrey[800]?.withOpacity(0.95),
-        // foregroundColor: Colors.lightBlueAccent,
         minimumSize: const Size(double.infinity, 48),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
