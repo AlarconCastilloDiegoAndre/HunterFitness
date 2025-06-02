@@ -1,3 +1,4 @@
+// hunter_fitness_app/lib/screens/home_screen.dart
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'login_screen.dart'; // Para el logout
@@ -14,10 +15,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final ApiService _apiService = ApiService();
 
-  Map<String, dynamic> _hunterProfile = {}; // Inicializar como mapa vacío
+  Map<String, dynamic> _hunterProfile = {};
   List<dynamic> _dailyQuests = [];
   bool _isLoadingQuests = true;
   String? _questsErrorMessage;
+  String _motivationalMessage = "Cargando mensajes del sistema...";
+  String _progressMessage = "";
+
 
   @override
   void initState() {
@@ -27,79 +31,86 @@ class _HomeScreenState extends State<HomeScreen> {
     print("HomeScreen initState: Tipo de widget.hunterProfileData: ${widget.hunterProfileData.runtimeType}");
 
     if (widget.hunterProfileData.isNotEmpty) {
-        _hunterProfile = Map<String, dynamic>.from(widget.hunterProfileData); // Asegurar copia y tipo
+        _hunterProfile = Map<String, dynamic>.from(widget.hunterProfileData);
         print("HomeScreen initState: _hunterProfile asignado y casteado CORRECTAMENTE.");
         print("HomeScreen initState: _hunterProfile contenido: $_hunterProfile");
+         _loadDailyQuests();
     } else {
         print("HomeScreen initState: ADVERTENCIA - widget.hunterProfileData está vacío. _hunterProfile permanecerá vacío.");
-    }
-    
-    // Verificar si _hunterProfile realmente tiene datos antes de cargar misiones
-    // Esto es más una comprobación de sanidad, ya que LoginScreen no debería navegar si no hay datos.
-    if (_hunterProfile.isEmpty) {
-        print("HomeScreen initState: _hunterProfile está vacío después de la asignación, no se cargarán misiones.");
-        // Opcionalmente, podrías forzar un logout o mostrar un error aquí si esto no debería ocurrir.
-        // Por ahora, la UI de error en build() lo manejará.
-    } else {
-        _loadDailyQuests();
+        // La UI de error en build() lo manejará.
     }
   }
 
   Future<void> _loadDailyQuests() async {
     print("HomeScreen _loadDailyQuests: Iniciando carga de misiones.");
     if (!mounted) return;
-    // ... (resto del método _loadDailyQuests como lo tenías, con sus prints)
-    // Asegúrate de que la extracción de summaryData y summaryData['quests'] sea robusta.
-    // Por ejemplo:
-    // final Map<String, dynamic>? summaryData = questsResult['data'] is Map<String, dynamic> 
-    //                                          ? questsResult['data'] as Map<String, dynamic> 
-    //                                          : null;
-    // if (summaryData != null && summaryData.containsKey('quests') && summaryData['quests'] is List) { ... }
-    // Copia aquí el método _loadDailyQuests de tu versión anterior de home_screen.dart
-    // que ya estaba funcionando o que tenía los prints de depuración.
-    // Solo me enfocaré en la parte del perfil por ahora.
-    // Reemplaza este comentario con tu método _loadDailyQuests:
-    // ----- INICIO Placeholder _loadDailyQuests -----
+    
     setState(() {
       _isLoadingQuests = true;
       _questsErrorMessage = null;
     });
-    try {
-      final questsResult = await _apiService.getDailyQuests();
-      print("HomeScreen - _loadDailyQuests - API Result: $questsResult");
 
-      if (questsResult['success'] == true) {
-        final dynamic summaryDataDynamic = questsResult['data'];
+    try {
+      // ApiService._handleApiResponse devuelve un mapa donde 'data' contiene el DailyQuestsSummaryDto
+      final Map<String, dynamic> questsResultFromService = await _apiService.getDailyQuests();
+      print("HomeScreen _loadDailyQuests - questsResultFromService (del ApiService): $questsResultFromService");
+
+      if (questsResultFromService['success'] == true) {
+        final dynamic summaryDataDynamic = questsResultFromService['data']; // Este es el DailyQuestsSummaryDto
+        
         if (summaryDataDynamic is Map<String, dynamic>) {
           final Map<String, dynamic> summaryData = summaryDataDynamic;
-          if (summaryData.containsKey('quests') && summaryData['quests'] is List) {
+          print("HomeScreen _loadDailyQuests - summaryData (contenido de 'data'): $summaryData");
+          print("HomeScreen _loadDailyQuests - summaryData Keys: ${summaryData.keys}");
+
+          // Intentar acceder a la lista de misiones con PascalCase "Quests" y luego camelCase "quests"
+          List<dynamic>? questsListFromApi;
+          if (summaryData.containsKey('Quests') && summaryData['Quests'] is List) {
+            questsListFromApi = summaryData['Quests'] as List<dynamic>;
+            print("HomeScreen _loadDailyQuests: Lista 'Quests' (PascalCase) encontrada.");
+          } else if (summaryData.containsKey('quests') && summaryData['quests'] is List) {
+            questsListFromApi = summaryData['quests'] as List<dynamic>;
+            print("HomeScreen _loadDailyQuests: Lista 'quests' (camelCase) encontrada como fallback.");
+          }
+
+          final String apiMotivationalMessage = summaryData['MotivationalMessage'] as String? ?? summaryData['motivationalMessage'] as String? ?? "¡Entrena duro, Cazador!";
+          final String apiProgressMessage = summaryData['ProgressMessage'] as String? ?? summaryData['progressMessage'] as String? ?? "";
+
+
+          if (questsListFromApi != null) {
             if (mounted) {
               setState(() {
-                _dailyQuests = summaryData['quests'] as List<dynamic>;
+                _dailyQuests = questsListFromApi!;
                 _isLoadingQuests = false;
+                _motivationalMessage = apiMotivationalMessage;
+                _progressMessage = apiProgressMessage;
                 if (_dailyQuests.isEmpty) {
-                  _questsErrorMessage = '[SISTEMA] No hay misiones diarias asignadas para hoy.';
-                  print("HomeScreen - _loadDailyQuests: No quests found in summaryData['quests'].");
+                  _questsErrorMessage = summaryData['ProgressMessage'] as String? ?? '[SISTEMA] No hay misiones diarias asignadas para hoy.';
+                  print("HomeScreen _loadDailyQuests: Lista de misiones está vacía.");
                 } else {
-                  print("HomeScreen - _loadDailyQuests: Quests loaded: ${_dailyQuests.length}");
+                  print("HomeScreen _loadDailyQuests: Misiones cargadas: ${_dailyQuests.length}");
                 }
               });
             }
           } else {
-            print("HomeScreen - _loadDailyQuests: 'quests' field is missing, not a list, or summaryData is not Map. summaryData: $summaryData, summaryData['quests'] type: ${summaryData['quests']?.runtimeType}");
+            print("HomeScreen _loadDailyQuests: El campo de la lista de misiones ('Quests' o 'quests') NO se encontró o NO es una Lista dentro de summaryData.");
+            print("HomeScreen _loadDailyQuests: Tipo de summaryData['Quests']: ${summaryData['Quests']?.runtimeType}");
+            print("HomeScreen _loadDailyQuests: Tipo de summaryData['quests']: ${summaryData['quests']?.runtimeType}");
             if (mounted) {
               setState(() {
-                _questsErrorMessage = '[SISTEMA] Formato de misiones inesperado desde la API.';
+                _questsErrorMessage = '[SISTEMA] Formato de lista de misiones inesperado desde la API.';
                 _isLoadingQuests = false;
                 _dailyQuests = [];
+                _motivationalMessage = apiMotivationalMessage;
+                _progressMessage = apiProgressMessage;
               });
             }
           }
         } else {
-           print("HomeScreen - _loadDailyQuests: questsResult['data'] no es un Map. Tipo: ${summaryDataDynamic?.runtimeType}");
+           print("HomeScreen _loadDailyQuests: questsResultFromService['data'] no es un Map. Tipo: ${summaryDataDynamic?.runtimeType}. Valor: $summaryDataDynamic");
            if (mounted) {
               setState(() {
-                _questsErrorMessage = '[SISTEMA] Formato de datos de misiones (summary) inesperado.';
+                _questsErrorMessage = '[SISTEMA] Formato de datos de resumen de misiones (summary) inesperado.';
                 _isLoadingQuests = false;
                 _dailyQuests = [];
               });
@@ -108,16 +119,16 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         if (mounted) {
           setState(() {
-            _questsErrorMessage = questsResult['message'] as String? ?? '[ERROR SISTEMA] Error al cargar misiones.';
+            _questsErrorMessage = questsResultFromService['message'] as String? ?? '[ERROR SISTEMA] Error al cargar misiones.';
             _isLoadingQuests = false;
             _dailyQuests = []; 
           });
-           print("HomeScreen - _loadDailyQuests: API call was not successful. Message: ${questsResult['message']}");
+           print("HomeScreen _loadDailyQuests: Llamada a API no fue exitosa. Mensaje: ${questsResultFromService['message']}");
         }
       }
     } catch (e, s) {
-      print("HomeScreen - _loadDailyQuests - Catch Error: $e");
-      print("HomeScreen - _loadDailyQuests - StackTrace: $s");
+      print("HomeScreen _loadDailyQuests - Catch Error: $e");
+      print("HomeScreen _loadDailyQuests - StackTrace: $s");
       if (mounted) {
         setState(() {
           _questsErrorMessage = "[ERROR SISTEMA] Fallo crítico al cargar misiones diarias.";
@@ -126,15 +137,15 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     }
-    // ----- FIN Placeholder _loadDailyQuests -----
   }
   
   void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: TextStyle(color: isError ? Colors.white : Colors.black87)),
+        content: Text(message, style: TextStyle(color: isError ? Colors.white : Colors.black87, fontWeight: FontWeight.bold)),
         backgroundColor: isError ? const Color(0xFFFF6666) : Colors.lightBlueAccent,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -143,19 +154,19 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     print("HomeScreen build: ----- Entrando al método build -----");
     
-    if (_hunterProfile.isEmpty) { // Cambio: chequear si está vacío en lugar de null, ya que lo inicializamos a {}
+    if (_hunterProfile.isEmpty) {
         print("HomeScreen build: _hunterProfile está vacío. Mostrando UI de error.");
         return Scaffold(
             backgroundColor: Colors.black,
             appBar: AppBar(
-                title: const Text("Error de Perfil", style: TextStyle(color: Colors.redAccent)),
+                title: const Text("Error de Perfil", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                 backgroundColor: Colors.grey[900]?.withOpacity(0.9),
                 elevation: 2,
-                automaticallyImplyLeading: false,
+                automaticallyImplyLeading: false, // No mostrar botón de regreso
                  actions: [
                     IconButton(
                         icon: const Icon(Icons.logout, color: Color(0xFFFF8A80)),
-                        tooltip: 'Cerrar Sesión',
+                        tooltip: 'Cerrar Sesión (Error)',
                         onPressed: () async {
                         await _apiService.logout();
                         if (mounted) {
@@ -169,13 +180,45 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                  ],
             ),
-            body: const Center(
+            body: Center(
                 child: Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Text(
-                        "Error: No se pudieron cargar los datos del perfil del cazador. Por favor, intenta reiniciar sesión o contacta a soporte.",
-                        style: TextStyle(color: Colors.redAccent, fontSize: 16),
-                        textAlign: TextAlign.center,
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.redAccent, size: 60),
+                        const SizedBox(height: 20),
+                        const Text(
+                            "Error: No se pudieron cargar los datos del perfil del cazador.",
+                            style: TextStyle(color: Colors.redAccent, fontSize: 18, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                            "Por favor, intenta reiniciar sesión. Si el problema persiste, contacta a soporte.",
+                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                            textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 30),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.logout),
+                          label: const Text("Cerrar Sesión"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent.withOpacity(0.8),
+                            foregroundColor: Colors.white
+                          ),
+                          onPressed: () async {
+                            await _apiService.logout();
+                            if (mounted) {
+                                Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                                (Route<dynamic> route) => false,
+                                );
+                            }
+                          },
+                        )
+                      ],
                     ),
                 ),
             ),
@@ -183,10 +226,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     print("HomeScreen build: _hunterProfile tiene datos. HunterName: ${_hunterProfile['hunterName']}");
 
+    // Extracción segura de datos del perfil
     final String hunterName = _hunterProfile['hunterName']?.toString() ?? 'Cazador';
     final int level = int.tryParse(_hunterProfile['level']?.toString() ?? '1') ?? 1;
     final int currentXP = int.tryParse(_hunterProfile['currentXP']?.toString() ?? '0') ?? 0;
-    final int xpForNextLevel = int.tryParse(_hunterProfile['xpRequiredForNextLevel']?.toString() ?? '100') ?? 100;
+    // El campo XPRequiredForNextLevel puede venir como 'xpRequiredForNextLevel' (camel) o 'XPRequiredForNextLevel' (Pascal)
+    final int xpForNextLevel = int.tryParse(
+                                  _hunterProfile['xpRequiredForNextLevel']?.toString() ?? 
+                                  _hunterProfile['XPRequiredForNextLevel']?.toString() ?? 
+                                  '100'
+                                ) ?? 100;
     final String rank = _hunterProfile['hunterRank']?.toString() ?? 'E';
     
     final double xpProgress = (xpForNextLevel > 0 && currentXP >=0 && currentXP <= xpForNextLevel) 
@@ -208,6 +257,11 @@ class _HomeScreenState extends State<HomeScreen> {
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.lightBlueAccent),
+            tooltip: 'Recargar Misiones',
+            onPressed: _isLoadingQuests ? null : _loadDailyQuests, // Deshabilitar si ya está cargando
+          ),
+          IconButton(
             icon: const Icon(Icons.logout, color: Color(0xFFFF8A80)),
             tooltip: 'Cerrar Sesión',
             onPressed: () async {
@@ -228,12 +282,29 @@ class _HomeScreenState extends State<HomeScreen> {
         color: Colors.lightBlueAccent,
         backgroundColor: Colors.grey[900],
         child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(), // Permitir scroll siempre para el RefreshIndicator
           padding: const EdgeInsets.all(12.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               _buildHunterInfoCard(hunterName, level, currentXP, xpForNextLevel, rank, xpProgress),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+               // Mensaje motivacional de la API
+              if (_motivationalMessage.isNotEmpty && !_isLoadingQuests)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Center(
+                    child: Text(
+                      _motivationalMessage,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.yellowAccent.withOpacity(0.9),
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ),
               _buildSectionTitle('[MISIÓN DIARIA]', Icons.assignment_turned_in_outlined),
               _buildDailyQuestsPanel(),
               const SizedBox(height: 20),
@@ -326,46 +397,87 @@ class _HomeScreenState extends State<HomeScreen> {
  Widget _buildDailyQuestsPanel() {
     if (_isLoadingQuests) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 20.0),
+        padding: EdgeInsets.symmetric(vertical: 30.0),
         child: Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent))),
       );
     }
-    if (_questsErrorMessage != null) { // Mostrar error si existe
+    if (_questsErrorMessage != null && _dailyQuests.isEmpty) { // Mostrar error solo si no hay misiones que mostrar
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 15.0),
-        child: Center(child: Text(_questsErrorMessage!, style: const TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.bold))),
+        padding: const EdgeInsets.symmetric(vertical: 20.0),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.error_outline, color: const Color(0xFFFF8A80).withOpacity(0.8), size: 30),
+              const SizedBox(height: 8),
+              Text(_questsErrorMessage!, style: const TextStyle(color: Color(0xFFFF8A80), fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center,),
+            ],
+          )
+        ),
       );
     }
-    if (_dailyQuests.isEmpty) {
-         return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 15.0),
-            child: Center(child: Text('[SISTEMA] No hay misiones diarias asignadas para hoy.', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic))),
+    if (_dailyQuests.isEmpty) { // Si no hay error pero está vacío
+         return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20.0),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(Icons.check_circle_outline, color: Colors.greenAccent.withOpacity(0.7), size: 30),
+                  const SizedBox(height: 8),
+                  Text(
+                    _progressMessage.isNotEmpty ? _progressMessage : '[SISTEMA] ¡Todas las misiones completadas por hoy o ninguna asignada!',
+                    style: TextStyle(color: Colors.greenAccent.withOpacity(0.9), fontStyle: FontStyle.italic, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              )
+            ),
          );
     }
 
     return Column(
       children: _dailyQuests.map((questData) {
+        // Asegurarse que questData es un Map antes de intentar acceder a sus claves
         if (questData is! Map<String, dynamic>) { 
             print("HomeScreen _buildDailyQuestsPanel: questData no es un Map. Tipo: ${questData?.runtimeType}. Valor: $questData");
-            return const SizedBox.shrink(); 
+            return const SizedBox.shrink(); // No renderizar nada si el formato es incorrecto
         }
         final Map<String, dynamic> quest = questData;
-        final String questName = quest['questName']?.toString() ?? 'Misión Desconocida';
-        final num currentProgNum = (quest['progress'] is num ? quest['progress'] : num.tryParse(quest['progress']?.toString() ?? '0')) ?? 0;
+
+        // Extracción segura de datos del quest, usando PascalCase y camelCase como fallback
+        final String questName = quest['questName']?.toString() ?? quest['QuestName']?.toString() ?? 'Misión Desconocida';
+        
+        // Para el progreso, intentar convertir de String si es necesario
+        num currentProgNum = 0;
+        dynamic progressValue = quest['progress'] ?? quest['Progress'];
+        if (progressValue is num) {
+          currentProgNum = progressValue;
+        } else if (progressValue is String) {
+          currentProgNum = num.tryParse(progressValue) ?? 0;
+        }
         final double progressFraction = (currentProgNum.toDouble() / 100.0).clamp(0.0, 1.0);
         
-        final String status = quest['status']?.toString() ?? 'Desconocido';
-        final String targetDesc = quest['targetDescription']?.toString() ?? 'Completar la tarea asignada';
+        final String status = quest['status']?.toString() ?? quest['Status']?.toString() ?? 'Desconocido';
+        final String targetDesc = quest['targetDescription']?.toString() ?? quest['TargetDescription']?.toString() ?? 'Completar la tarea asignada';
+        final String difficultyColorHex = quest['difficultyColor']?.toString() ?? quest['DifficultyColor']?.toString() ?? '#757575';
+        final String questTypeIcon = quest['questTypeIcon']?.toString() ?? quest['QuestTypeIcon']?.toString() ?? '⚡';
+
 
         Color statusColor = Colors.grey[600]!;
-        IconData statusIcon = Icons.radio_button_unchecked_outlined;
+        try {
+          statusColor = Color(int.parse(difficultyColorHex.replaceFirst('#', 'FF'), radix: 16));
+        } catch (e) {
+          print("Error parsing difficultyColorHex: $difficultyColorHex. Error: $e");
+          statusColor = Colors.grey[600]!; // Fallback color
+        }
+        
+        IconData statusIconData = Icons.radio_button_unchecked_outlined;
 
-        if (status == 'Completed') {
-          statusColor = Colors.greenAccent.shade400;
-          statusIcon = Icons.check_circle_outline;
-        } else if (status == 'InProgress') {
-          statusColor = Colors.yellowAccent.shade400;
-          statusIcon = Icons.hourglass_empty_outlined;
+        if (status.toLowerCase() == 'completed') {
+          statusIconData = Icons.check_circle_outline;
+          // Podríamos usar un color específico para completado si difficultyColor no es adecuado
+          // statusColor = Colors.greenAccent.shade400; 
+        } else if (status.toLowerCase() == 'inprogress') {
+          statusIconData = Icons.hourglass_empty_outlined;
         }
         
         return Card(
@@ -382,9 +494,11 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(statusIcon, color: statusColor, size: 20),
+                    // Icon(statusIconData, color: statusColor, size: 20),
+                    Text(questTypeIcon, style: TextStyle(fontSize: 18, color: statusColor)), // Usar el icono de tipo de quest
                     const SizedBox(width: 10),
                     Expanded(child: Text(questName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15))),
+                    Text(status, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold))
                   ],
                 ),
                 const SizedBox(height: 6),

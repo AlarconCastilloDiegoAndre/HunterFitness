@@ -27,7 +27,7 @@ class ApiService {
     }
     if (rawResponseBody.isEmpty && response.statusCode == 204) {
       print('$operation API Info: Respuesta 204 No Content.');
-      return {'success': true, 'message': 'Operación completada sin contenido.'}; // 'data' puede ser implicitamente null
+      return {'success': true, 'message': 'Operación completada sin contenido.', 'data': null, 'hunterProfile': null};
     }
 
     Map<String, dynamic> responseData;
@@ -38,40 +38,24 @@ class ApiService {
         print('$operation - jsonDecode exitoso. responseData es un Map.');
       } else {
         print('$operation API Error: El JSON decodificado no es un Mapa. Tipo actual: ${decodedJson.runtimeType}');
-        return {'success': false, 'message': 'Respuesta del servidor con formato inesperado (no es objeto JSON).'};
+        return {'success': false, 'message': 'Respuesta del servidor con formato inesperado (no es objeto JSON).', 'data': null, 'hunterProfile': null};
       }
     } catch (e) {
       print('$operation API Error: Fallo al decodificar JSON. Error: $e. Cuerpo: "$rawResponseBody"');
-      return {'success': false, 'message': 'Respuesta inesperada del servidor (formato incorrecto).'};
+      return {'success': false, 'message': 'Respuesta inesperada del servidor (formato incorrecto).', 'data': null, 'hunterProfile': null};
     }
 
     bool apiOverallSuccess = false;
-    if (responseData.containsKey('Success')) {
-        var successValue = responseData['Success'];
-        if (successValue is bool) {
-            apiOverallSuccess = successValue;
-        } else if (successValue is String) {
-            apiOverallSuccess = successValue.toLowerCase() == 'true';
-        }
-    } else if (responseData.containsKey('success')) {
-        var successValueCamel = responseData['success'];
-         if (successValueCamel is bool) {
-            apiOverallSuccess = successValueCamel;
-        } else if (successValueCamel is String) {
-            apiOverallSuccess = successValueCamel.toLowerCase() == 'true';
-        } else {
-            print('$operation - ADVERTENCIA: Ninguna clave de éxito ("Success" o "success") encontrada o válida en el JSON principal.');
-        }
+    dynamic successValue = responseData['Success'] ?? responseData['success'];
+    if (successValue is bool) {
+        apiOverallSuccess = successValue;
+    } else if (successValue is String) {
+        apiOverallSuccess = successValue.toLowerCase() == 'true';
     } else {
-        print('$operation - ADVERTENCIA: Clave "Success" (PascalCase) ni "success" (camelCase) no encontrada en el JSON principal.');
+        print('$operation - ADVERTENCIA: Clave de éxito ("Success" o "success") no encontrada o no es bool/String en el JSON principal.');
     }
     
-    String apiOverallMessage = 'Mensaje no proporcionado por la API.';
-    if (responseData.containsKey('Message')) {
-        apiOverallMessage = responseData['Message'] as String? ?? apiOverallMessage;
-    } else if (responseData.containsKey('message')) {
-        apiOverallMessage = responseData['message'] as String? ?? apiOverallMessage;
-    }
+    String apiOverallMessage = responseData['Message'] as String? ?? responseData['message'] as String? ?? 'Mensaje no proporcionado por la API.';
     
     print('$operation - apiOverallSuccess (del JSON principal): $apiOverallSuccess');
     print('$operation - apiOverallMessage (del JSON principal): "$apiOverallMessage"');
@@ -80,105 +64,76 @@ class ApiService {
 
     if (!httpSuccess) {
       print('$operation - Fallo HTTP. Mensaje de API: "$apiOverallMessage". Código: ${response.statusCode}.');
-      String httpErrorMessage = responseData.containsKey('Message') || responseData.containsKey('message') 
+      String httpErrorMessage = (responseData.containsKey('Message') || responseData.containsKey('message')) 
                                 ? apiOverallMessage 
                                 : 'Error de comunicación con el servidor';
-      return {'success': false, 'message': '$httpErrorMessage (HTTP ${response.statusCode})'};
+      return {'success': false, 'message': '$httpErrorMessage (HTTP ${response.statusCode})', 'data': null, 'hunterProfile': null};
     }
 
+    // Si el HTTP fue exitoso pero la API declara fallo explícitamente
     if (!apiOverallSuccess) {
         print('$operation - Fallo declarado por API (Success: false en JSON principal). Mensaje: "$apiOverallMessage"');
-        return {'success': false, 'message': apiOverallMessage};
+        // Retornar el 'data' original si existe, podría contener más detalles del error de la API anidado.
+        Map<String, dynamic>? originalDataPayload = responseData['data'] as Map<String, dynamic>? ?? responseData['Data'] as Map<String, dynamic>?;
+        return {'success': false, 'message': apiOverallMessage, 'data': originalDataPayload, 'hunterProfile': null};
     }
 
-    Map<String, dynamic>? dataPayload;
-    if (responseData.containsKey('data') && responseData['data'] is Map<String, dynamic>) {
-        dataPayload = responseData['data'] as Map<String, dynamic>;
-        print('ApiService ($operation): dataPayload (responseData["data"]) asignado.');
-    } else if (responseData.containsKey('Data') && responseData['Data'] is Map<String, dynamic>) { 
-        dataPayload = responseData['Data'] as Map<String, dynamic>;
-        print('ApiService ($operation): dataPayload (responseData["Data"]) asignado como fallback.');
-    } else {
-        print('ApiService ($operation): dataPayload (ni "data" ni "Data") no encontrado o no es un Map en responseData. Keys: ${responseData.keys}');
-    }
+    // En este punto, HTTP fue exitoso Y la bandera 'success' principal de la API es true.
+    Map<String, dynamic>? dataFieldFromResponse = responseData['data'] as Map<String, dynamic>? ?? responseData['Data'] as Map<String, dynamic>?;
     
-    String? token; // Token a ser guardado y potencialmente retornado
-    Map<String, dynamic>? hunterDataObjectAsMap; // Perfil del hunter
+    String? tokenFromDataField;
+    Map<String, dynamic>? hunterProfileFromDataField;
 
-    if (dataPayload != null) {
-      print('ApiService ($operation): Procesando dataPayload. Keys: ${dataPayload.keys}');
-      if (dataPayload.containsKey('token') && dataPayload['token'] is String) {
-        token = dataPayload['token'] as String?; // Extraer token de dataPayload
-        print('ApiService ($operation): Token encontrado DENTRO de dataPayload.');
+    if (dataFieldFromResponse != null) {
+      print('$operation - dataFieldFromResponse (contenido de responseData["data"] o ["Data"]) Keys: ${dataFieldFromResponse.keys}');
+      
+      tokenFromDataField = dataFieldFromResponse['token'] as String? ?? dataFieldFromResponse['Token'] as String?;
+      if (tokenFromDataField != null) {
+        print('$operation - Token encontrado DENTRO de dataFieldFromResponse: $tokenFromDataField');
       } else {
-        print('ApiService ($operation): Clave "token" no encontrada o no es String dentro de dataPayload.');
+        print('$operation - Token NO encontrado dentro de dataFieldFromResponse (keys: ${dataFieldFromResponse.keys}).');
       }
       
-      if (dataPayload.containsKey('hunter')) {
-        if (dataPayload['hunter'] is Map<String, dynamic>) {
-          hunterDataObjectAsMap = dataPayload['hunter'] as Map<String, dynamic>;
-          print('ApiService ($operation): Objeto Hunter ENCONTRADO DENTRO de dataPayload y asignado como Map<String, dynamic>.');
+      dynamic hunterRawData = dataFieldFromResponse['hunter'] ?? dataFieldFromResponse['Hunter'];
+      if (hunterRawData != null) {
+        if (hunterRawData is Map) {
+          try {
+            hunterProfileFromDataField = Map<String, dynamic>.from(hunterRawData);
+            print('$operation - Perfil Hunter extraído exitosamente de dataFieldFromResponse["hunter" o "Hunter"]: $hunterProfileFromDataField');
+          } catch (e) {
+            print('$operation - Error al castear hunterRawData a Map<String, dynamic>: $e. hunterRawData: $hunterRawData');
+          }
         } else {
-          print('ApiService ($operation): Clave "hunter" encontrada en dataPayload, pero NO es un Map<String, dynamic>. Tipo: ${dataPayload['hunter']?.runtimeType}');
+          print('$operation - "hunter" (o "Hunter") encontrado en dataFieldFromResponse, PERO NO es un Map. Tipo actual: ${hunterRawData.runtimeType}. Valor: $hunterRawData');
         }
       } else {
-        print('ApiService ($operation): Clave "hunter" no encontrada dentro de dataPayload.');
+         print('$operation - "hunter" (o "Hunter") NO encontrado dentro de dataFieldFromResponse (keys: ${dataFieldFromResponse.keys}).');
       }
     } else {
-        print('ApiService ($operation): dataPayload es null, no se puede extraer token ni hunter de él.');
+        print('$operation - dataFieldFromResponse (responseData["data"] o ["Data"]) es null o no es un Map. No se puede extraer token ni hunter de él.');
     }
 
-    // Si el token no se encontró en dataPayload, intentar buscarlo en el nivel superior
-    // (esto es menos probable con tu estructura de API actual, pero es un fallback)
-    token ??= responseData['token'] as String?;
-
-    // Lógica para guardar el token si es una operación de LOGIN o REGISTER
-    if (operation == 'LOGIN' || operation == 'REGISTER') {
-      if (token != null) {
-        await _storage.write(key: 'jwt_token', value: token);
-        print('ApiService ($operation): Token guardado: $token');
-      } else {
-        print('ApiService ($operation): Token NO encontrado en la respuesta para guardar.');
-      }
-      // Log sobre hunterDataObjectAsMap (ya se hace más abajo antes del return)
-      if (hunterDataObjectAsMap == null) {
-         print('ApiService ($operation): hunterDataObjectAsMap SIGUE SIENDO NULL después de todos los intentos. NO SE PUEDE CONTINUAR con datos del hunter si se esperaba.');
-      }
+    if ((operation == 'LOGIN' || operation == 'REGISTER') && tokenFromDataField != null) {
+      await _storage.write(key: 'jwt_token', value: tokenFromDataField);
+      print('ApiService ($operation): Token guardado: $tokenFromDataField');
+    } else if (operation == 'LOGIN' || operation == 'REGISTER') {
+      print('ApiService ($operation): Token NO encontrado en la respuesta para guardar.');
     }
     
-    // Logs de los componentes clave ANTES de construir el mapa de retorno
     print('ApiService ($operation): VALOR FINAL apiOverallSuccess: $apiOverallSuccess');
     print('ApiService ($operation): VALOR FINAL apiOverallMessage: "$apiOverallMessage"');
-    print('ApiService ($operation): VALOR FINAL token (que se intentó guardar): $token');
-    print('ApiService ($operation): VALOR FINAL hunterDataObjectAsMap (perfil del hunter): $hunterDataObjectAsMap');
-    print('ApiService ($operation): VALOR FINAL dataPayload (este es responseData["data"]): $dataPayload');
+    print('ApiService ($operation): VALOR FINAL token (extraído de dataField): $tokenFromDataField');
+    print('ApiService ($operation): VALOR FINAL hunterProfile (extraído de dataField): $hunterProfileFromDataField');
+    print('ApiService ($operation): VALOR FINAL dataFieldFromResponse (objeto "data" completo de la API): $dataFieldFromResponse');
 
-    // Construcción del mapa de retorno
-    Map<String, dynamic> mapToReturn = {
+    return {
       'success': apiOverallSuccess,
       'message': apiOverallMessage,
-      // 'token': token, // Comentado: el token está en 'data', LoginScreen lo puede tomar de ahí si es necesario.
-                       // O podrías decidir retornarlo aquí también si es más conveniente para otras partes de tu app.
-      // 'hunter': hunterDataObjectAsMap, // Comentado: Esta es la asignación que resultaba en 'hunter: null' en LoginScreen.
-                                       // La UI ahora debe leer de 'data.hunter'.
-      'data': dataPayload, // dataPayload ES responseData['data'], y ya contiene 'token' y 'hunter' de la API.
+      'data': dataFieldFromResponse, // El AuthResponseDto completo o el payload de quests/etc.
+      'token': tokenFromDataField, // Token extraído para conveniencia (puede ser null)
+      'hunterProfile': hunterProfileFromDataField, // Perfil del hunter extraído para conveniencia (puede ser null)
     };
-
-    // Para depurar si 'hunter' se pierde al asignarlo directamente a mapToReturn['hunter']
-    // Forzamos la asignación de hunterDataObjectAsMap a una nueva clave para ver si se mantiene.
-    if (hunterDataObjectAsMap != null) {
-      mapToReturn['directHunterObjectFromService'] = Map<String, dynamic>.from(hunterDataObjectAsMap);
-    } else {
-      mapToReturn['directHunterObjectFromService'] = null;
-    }
-
-    print('ApiService ($operation): MAPA FINAL A RETORNAR: $mapToReturn');
-    print('ApiService ($operation): MAPA FINAL A RETORNAR - Valor de "data": ${mapToReturn['data']}');
-    print('ApiService ($operation): MAPA FINAL A RETORNAR - Valor de "directHunterObjectFromService": ${mapToReturn['directHunterObjectFromService']}');
-
-    return mapToReturn;
-
-  } // Fin de _handleApiResponse
+  }
 
   Future<Map<String, dynamic>> login(String username, String password) async {
     final Uri loginUrl = Uri.parse('$_baseUrl/auth/login');
@@ -239,7 +194,24 @@ class ApiService {
           'Authorization': 'Bearer $token',
         },
       );
-      return await _handleApiResponse(response, 'GET_DAILY_QUESTS');
+      // _handleApiResponse ahora devuelve un mapa con 'data' que contiene el DailyQuestsSummaryDto
+      // y 'hunterProfile' que será null aquí.
+      Map<String,dynamic> parsedResponse = await _handleApiResponse(response, 'GET_DAILY_QUESTS');
+      
+      // Para mantener la compatibilidad con cómo HomeScreen espera los datos de quests:
+      // Si _handleApiResponse fue exitoso, y parsedResponse['data'] tiene la estructura de DailyQuestsSummaryDto,
+      // entonces la lógica en HomeScreen para acceder a parsedResponse['data']['quests'] debería seguir funcionando.
+      // Si necesitas devolver la estructura anterior exacta para getDailyQuests, podrías hacer esto:
+      // return {
+      //   'success': parsedResponse['success'],
+      //   'message': parsedResponse['message'],
+      //   'data': parsedResponse['data'] // Aquí 'data' es el DailyQuestsSummaryDto
+      // };
+      // Por ahora, devolvemos el mapa completo de _handleApiResponse. HomeScreen deberá adaptarse si es necesario,
+      // o puedes ajustar este retorno como se comentó arriba.
+      return parsedResponse;
+
+
     } catch (e) {
       print('ApiService: Excepción en getDailyQuests (red/conexión): ${e.toString()}');
       return {'success': false, 'message': 'Error de red o conexión (misiones): ${e.toString()}'};

@@ -22,9 +22,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (!(_formKey.currentState?.validate() ?? false)) {
-      setState(() {
-        _uiMessage = '';
-      });
+      if (mounted) { // Asegurarse que el widget está montado antes de llamar a setState
+        setState(() {
+          _uiMessage = ''; // Limpiar mensajes previos si la validación falla
+        });
+      }
       return;
     }
 
@@ -41,43 +43,34 @@ class _LoginScreenState extends State<LoginScreen> {
       _passwordController.text,
     );
 
-    if (!mounted) return;
+    if (!mounted) return; // Verificar si el widget sigue montado después de la llamada asíncrona
 
-    print('LoginScreen DEBUG: resultFromService COMPLETO: $resultFromService');
+    print('LoginScreen _login: resultFromService COMPLETO: $resultFromService');
 
     bool successFromApiService = resultFromService['success'] as bool? ?? false;
     String messageFromApiService = resultFromService['message'] as String? ?? '[SISTEMA] Respuesta no clara de la API.';
     
-    Map<String, dynamic>? finalExtractedHunterProfile; 
+    // Acceder directamente a 'hunterProfile' que _handleApiResponse ahora debería proveer
+    Map<String, dynamic>? extractedHunterProfile = resultFromService['hunterProfile'] as Map<String, dynamic>?;
 
-    Map<String, dynamic>? topLevelDataField = resultFromService['data'] as Map<String, dynamic>? ?? resultFromService['Data'] as Map<String, dynamic>?;
-
-    if (topLevelDataField != null) {
-      print('LoginScreen DEBUG: topLevelDataField (data o Data) encontrado. Keys: ${topLevelDataField.keys}');
-      dynamic hunterFromData = topLevelDataField['hunter']; // Obtener como dynamic primero
-
-      // **** SIMPLIFICACIÓN DE LA CONDICIÓN ****
-      // Si hunterFromData no es null, intentamos el casteo.
-      // El try-catch manejará si no es un Map compatible.
-      if (hunterFromData != null) { 
-        print('LoginScreen DEBUG: hunterFromData (topLevelDataField["hunter"]) NO es null. Intentando casteo. Contenido: $hunterFromData, Tipo: ${hunterFromData.runtimeType}');
-        try {
-          finalExtractedHunterProfile = Map<String, dynamic>.from(hunterFromData as Map); // Casteo explícito a Map aquí
-          print('LoginScreen DEBUG: Perfil del cazador extraído y casteado de topLevelDataField["hunter"]: $finalExtractedHunterProfile');
-        } catch (e) {
-          print('LoginScreen DEBUG: Error al castear hunter desde topLevelDataField["hunter"]: $e. Contenido de hunterFromData: $hunterFromData');
-          finalExtractedHunterProfile = null;
-        }
-      } else {
-        print('LoginScreen DEBUG: "hunter" es null dentro de topLevelDataField.');
-      }
-    } else {
-      print('LoginScreen DEBUG: Ni "data" ni "Data" se encontraron como Map en resultFromService.');
-      // No hay necesidad de fallback a 'directHunterObjectFromService' si ApiService no lo puebla consistentemente.
+    print('LoginScreen _login: successFromApiService: $successFromApiService');
+    print('LoginScreen _login: messageFromApiService: "$messageFromApiService"');
+    print('LoginScreen _login: extractedHunterProfile desde resultFromService["hunterProfile"]: $extractedHunterProfile');
+    
+    // Debug adicional: inspeccionar el campo 'data' si 'hunterProfile' es null
+    if (extractedHunterProfile == null && resultFromService['data'] != null) {
+        print('LoginScreen _login: ADVERTENCIA - extractedHunterProfile fue null. Inspeccionando resultFromService["data"]: ${resultFromService['data']}');
+        // Podrías intentar una extracción de fallback aquí si es necesario, pero idealmente 'hunterProfile' debería ser suficiente.
+        // Map<String, dynamic>? dataField = resultFromService['data'] as Map<String, dynamic>?;
+        // if (dataField != null) {
+        //   dynamic hunterFromDataField = dataField['hunter'] ?? dataField['Hunter'];
+        //   if (hunterFromDataField is Map) {
+        //      print('LoginScreen _login: Fallback - hunter encontrado en dataField: $hunterFromDataField');
+        //      // extractedHunterProfile = Map<String, dynamic>.from(hunterFromDataField); // Opcional si se quiere reintentar
+        //   }
+        // }
     }
-            
-    print('LoginScreen DEBUG: Tipo de finalExtractedHunterProfile (después de todo): ${finalExtractedHunterProfile?.runtimeType}');
-    print('LoginScreen DEBUG: Contenido de finalExtractedHunterProfile (después de todo): $finalExtractedHunterProfile');
+
 
     if (mounted) {
       setState(() {
@@ -88,8 +81,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (successFromApiService) {
-      if (finalExtractedHunterProfile != null) { 
-        print('LoginScreen DEBUG: finalExtractedHunterProfile NO es null. PREPARANDO NAVEGACIÓN...');
+      if (extractedHunterProfile != null && extractedHunterProfile.isNotEmpty) { 
+        print('LoginScreen _login: Login exitoso Y Perfil del cazador extraído CORRECTAMENTE. Navegando a HomeScreen...');
         
         if (mounted) {
            ScaffoldMessenger.of(context).showSnackBar(
@@ -107,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => HomeScreen(hunterProfileData: finalExtractedHunterProfile!),
+                  builder: (context) => HomeScreen(hunterProfileData: extractedHunterProfile),
                 ),
               );
             }
@@ -115,16 +108,17 @@ class _LoginScreenState extends State<LoginScreen> {
         }
         return; 
       } else {
-        print('LoginScreen DEBUG: finalExtractedHunterProfile es null. Se mostrará error en UI.');
+        print('LoginScreen _login: Login API exitoso, PERO los datos del cazador (extractedHunterProfile) están ausentes o vacíos en el frontend.');
         if (mounted) {
             setState(() {
-              _uiMessage = '[ERROR UI] Login exitoso pero los datos del cazador están ausentes o corruptos.';
+              _uiMessage = '[ERROR UI] Login exitoso pero los datos del cazador no se pudieron procesar. $messageFromApiService';
               _messageIsErrorType = true;
             });
           }
       }
     } else {
-      print('LoginScreen DEBUG: successFromApiService fue false.');
+      print('LoginScreen _login: successFromApiService fue false. Mensaje de la API: "$messageFromApiService"');
+      // _uiMessage y _messageIsErrorType ya se establecieron arriba por el setState.
     }
   }
 
@@ -269,11 +263,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(focusedInputBorderColor)),
                           const SizedBox(height: 15),
-                          Text(
-                            _uiMessage,
-                            style: TextStyle(color: messageColor, fontWeight: FontWeight.bold, fontSize: 14),
-                            textAlign: TextAlign.center,
-                          )
+                          if (_uiMessage.isNotEmpty) // Mostrar mensaje de carga solo si hay uno
+                            Text(
+                              _uiMessage,
+                              style: TextStyle(color: messageColor, fontWeight: FontWeight.bold, fontSize: 14),
+                              textAlign: TextAlign.center,
+                            )
                         ],
                       ))
                     : ElevatedButton(
@@ -306,9 +301,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 25),
                 TextButton(
                   onPressed: () {
-                    if (mounted) {
+                    if (mounted) { // Asegurarse que el widget está montado
                       setState(() {
-                        _uiMessage = '';
+                        _uiMessage = ''; // Limpiar mensaje al navegar
                       });
                     }
                     Navigator.push(
@@ -322,7 +317,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(
                       color: linkColor,
                       decoration: TextDecoration.underline,
-                      decorationColor: linkColor,
+                      decorationColor: linkColor.withOpacity(0.7), // Hacer el subrayado un poco más sutil
                       fontSize: 14,
                     ),
                   ),

@@ -24,9 +24,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Future<void> _register() async {
     if (!(_formKey.currentState?.validate() ?? false)) {
-       setState(() {
-        _uiMessage = ''; // Limpiar mensaje si la validación del formulario falla
-      });
+       if (mounted) {
+        setState(() {
+          _uiMessage = ''; 
+        });
+      }
       return;
     }
 
@@ -58,57 +60,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     
     if (!mounted) return;
 
-    print('RegistrationScreen DEBUG: resultFromService COMPLETO: $resultFromService');
+    print('RegistrationScreen _register: resultFromService COMPLETO: $resultFromService');
 
     bool successFromApiService = resultFromService['success'] as bool? ?? false;
     String messageFromApiService = resultFromService['message'] as String? ?? '[SISTEMA] Respuesta no clara de la API.';
     
-    Map<String, dynamic>? finalExtractedHunterProfile;
-
-    // Lógica de extracción robusta (priorizando 'Data' luego 'data')
-    Map<String, dynamic>? topLevelDataField;
-    if (resultFromService.containsKey('Data') && resultFromService['Data'] is Map<String, dynamic>) {
-        topLevelDataField = resultFromService['Data'] as Map<String, dynamic>;
-        print('RegistrationScreen DEBUG: Clave "Data" (PascalCase) encontrada y es Map. Keys: ${topLevelDataField.keys}');
-    } else if (resultFromService.containsKey('data') && resultFromService['data'] is Map<String, dynamic>) {
-        topLevelDataField = resultFromService['data'] as Map<String, dynamic>;
-        print('RegistrationScreen DEBUG: Clave "data" (camelCase) encontrada y es Map (fallback). Keys: ${topLevelDataField.keys}');
-    }
-
-    if (topLevelDataField != null) {
-      print('RegistrationScreen DEBUG: topLevelDataField (Data o data) encontrado. Keys: ${topLevelDataField.keys}');
-      dynamic hunterFromData = topLevelDataField['hunter']; 
-
-      if (hunterFromData != null) { 
-        print('RegistrationScreen DEBUG: hunterFromData (topLevelDataField["hunter"]) NO es null. Intentando casteo. Contenido: $hunterFromData, Tipo: ${hunterFromData.runtimeType}');
-        try {
-          finalExtractedHunterProfile = Map<String, dynamic>.from(hunterFromData as Map); 
-          print('RegistrationScreen DEBUG: Perfil extraído de topLevelDataField["hunter"] y casteado: $finalExtractedHunterProfile');
-        } catch (e) {
-          print('RegistrationScreen DEBUG: Error al castear hunter desde topLevelDataField["hunter"]: $e. Contenido de hunterFromData: $hunterFromData');
-          finalExtractedHunterProfile = null;
-        }
-      } else {
-        print('RegistrationScreen DEBUG: "hunter" es null dentro de topLevelDataField.');
-      }
-    } else {
-      print('RegistrationScreen DEBUG: Ni "Data" ni "data" se encontraron como Map en resultFromService.');
-      // Fallback a directHunterObjectFromService si se mantiene en ApiService
-      dynamic directHunterFallback = resultFromService['directHunterObjectFromService'];
-      if (directHunterFallback != null && directHunterFallback is Map) {
-        try {
-          finalExtractedHunterProfile = Map<String, dynamic>.from(directHunterFallback);
-          print('RegistrationScreen DEBUG: Perfil extraído de "directHunterObjectFromService" (fallback) y casteado: $finalExtractedHunterProfile');
-        } catch (e) {
-          print('RegistrationScreen DEBUG: Error al castear hunter desde directHunterObjectFromService: $e');
-        }
-      } else {
-        print('RegistrationScreen DEBUG: Fallback a "directHunterObjectFromService" también falló (null o no Map).');
-      }
-    }
+    Map<String, dynamic>? extractedHunterProfile = resultFromService['hunterProfile'] as Map<String, dynamic>?;
             
-    print('RegistrationScreen DEBUG: Tipo de finalExtractedHunterProfile (después de todo): ${finalExtractedHunterProfile?.runtimeType}');
-    print('RegistrationScreen DEBUG: Contenido de finalExtractedHunterProfile (después de todo): $finalExtractedHunterProfile');
+    print('RegistrationScreen _register: successFromApiService: $successFromApiService');
+    print('RegistrationScreen _register: messageFromApiService: "$messageFromApiService"');
+    print('RegistrationScreen _register: extractedHunterProfile desde resultFromService["hunterProfile"]: $extractedHunterProfile');
+    
+    // Debug adicional: inspeccionar el campo 'data' si 'hunterProfile' es null
+    if (extractedHunterProfile == null && resultFromService['data'] != null) {
+        print('RegistrationScreen _register: ADVERTENCIA - extractedHunterProfile fue null. Inspeccionando resultFromService["data"]: ${resultFromService['data']}');
+    }
+
 
     if (mounted) {
       setState(() {
@@ -119,8 +86,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
 
     if (successFromApiService) {
-      if (finalExtractedHunterProfile != null) { 
-        print('RegistrationScreen DEBUG: finalExtractedHunterProfile NO es null. PREPARANDO NAVEGACIÓN...');
+      if (extractedHunterProfile != null && extractedHunterProfile.isNotEmpty) { 
+        print('RegistrationScreen _register: Registro exitoso Y Perfil del cazador extraído CORRECTAMENTE. Navegando a HomeScreen...');
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -135,7 +102,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => HomeScreen(hunterProfileData: finalExtractedHunterProfile!),
+                  builder: (context) => HomeScreen(hunterProfileData: extractedHunterProfile),
                 ),
                 (Route<dynamic> route) => false,
               );
@@ -144,16 +111,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         }
         return; 
       } else {
-         print('RegistrationScreen DEBUG: Registro API exitoso, pero finalExtractedHunterProfile es null.');
+         print('RegistrationScreen _register: Registro API exitoso, PERO los datos del cazador (extractedHunterProfile) están ausentes o vacíos en el frontend.');
          if (mounted) {
             setState(() {
-              _uiMessage = '[ERROR UI] Registro exitoso pero los datos del cazador están ausentes o corruptos.';
+              _uiMessage = '[ERROR UI] Registro exitoso pero los datos del cazador no se pudieron procesar. $messageFromApiService';
               _messageIsErrorType = true;
             });
          }
       }
     } else {
-        print('RegistrationScreen DEBUG: successFromApiService fue false.');
+        print('RegistrationScreen _register: successFromApiService fue false. Mensaje de la API: "$messageFromApiService"');
     }
   }
 
@@ -165,6 +132,59 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Widget _buildTextFormField({
+    required TextEditingController controller,
+    required String labelText,
+    required IconData prefixIconData,
+    String? hintText,
+    bool obscureText = false,
+    TextInputType keyboardType = TextInputType.text,
+    required String? Function(String?) validator,
+  }) {
+    final Color inputLabelColor = Colors.grey;
+    final Color inputPrefixIconColor = Colors.lightBlueAccent;
+    final Color inputFillColor = Colors.black.withOpacity(0.5);
+    final Color inputEnabledBorderColor = Colors.blueGrey.withOpacity(0.7);
+    final Color inputFocusedBorderColor = Colors.lightBlueAccent;
+    final Color inputErrorBorderColor = const Color(0xFFFF6B6B);
+    final Color inputTextColor = Colors.white;
+
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: labelText,
+        labelStyle: TextStyle(color: inputLabelColor, fontSize: 14),
+        hintText: hintText,
+        hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+        prefixIcon: Icon(prefixIconData, color: inputPrefixIconColor, size: 20),
+        filled: true,
+        fillColor: inputFillColor,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: inputEnabledBorderColor),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: inputFocusedBorderColor, width: 1.5),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: inputErrorBorderColor),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: inputErrorBorderColor, width: 1.5),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        errorStyle: TextStyle(color: inputErrorBorderColor, fontWeight: FontWeight.bold, fontSize: 12),
+      ),
+      style: TextStyle(color: inputTextColor, fontSize: 15),
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      validator: validator,
+    );
   }
 
   @override
@@ -299,11 +319,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         children: [
                           CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(focusedInputBorderColor)),
                           const SizedBox(height: 15),
-                          Text(
-                            _uiMessage,
-                            style: TextStyle(color: messageColor, fontWeight: FontWeight.bold, fontSize: 14),
-                            textAlign: TextAlign.center,
-                          )
+                           if (_uiMessage.isNotEmpty)
+                            Text(
+                              _uiMessage,
+                              style: TextStyle(color: messageColor, fontWeight: FontWeight.bold, fontSize: 14),
+                              textAlign: TextAlign.center,
+                            )
                         ],
                       ))
                     : ElevatedButton(
@@ -358,59 +379,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildTextFormField({
-    required TextEditingController controller,
-    required String labelText,
-    required IconData prefixIconData,
-    String? hintText,
-    bool obscureText = false,
-    TextInputType keyboardType = TextInputType.text,
-    required String? Function(String?) validator,
-  }) {
-    final Color inputLabelColor = Colors.grey;
-    final Color inputPrefixIconColor = Colors.lightBlueAccent;
-    final Color inputFillColor = Colors.black.withOpacity(0.5);
-    final Color inputEnabledBorderColor = Colors.blueGrey.withOpacity(0.7);
-    final Color inputFocusedBorderColor = Colors.lightBlueAccent;
-    final Color inputErrorBorderColor = const Color(0xFFFF6B6B);
-    final Color inputTextColor = Colors.white;
-
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: labelText,
-        labelStyle: TextStyle(color: inputLabelColor, fontSize: 14),
-        hintText: hintText,
-        hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-        prefixIcon: Icon(prefixIconData, color: inputPrefixIconColor, size: 20),
-        filled: true,
-        fillColor: inputFillColor,
-        contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
-        enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: inputEnabledBorderColor),
-          borderRadius: BorderRadius.circular(5),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: inputFocusedBorderColor, width: 1.5),
-          borderRadius: BorderRadius.circular(5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: inputErrorBorderColor),
-          borderRadius: BorderRadius.circular(5),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: inputErrorBorderColor, width: 1.5),
-          borderRadius: BorderRadius.circular(5),
-        ),
-        errorStyle: TextStyle(color: inputErrorBorderColor, fontWeight: FontWeight.bold, fontSize: 12),
-      ),
-      style: TextStyle(color: inputTextColor, fontSize: 15),
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      validator: validator,
     );
   }
 }
