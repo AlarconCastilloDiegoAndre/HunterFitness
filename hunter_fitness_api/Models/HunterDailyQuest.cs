@@ -73,17 +73,40 @@ namespace HunterFitness.API.Models
 
         public void CompleteQuest()
         {
-            if (CanComplete() && Status == "InProgress")
+            // Asumimos que CanComplete() ya validó que Quest != null,
+            // pero añadimos defensas aquí también.
+            // Permitir completar desde "Assigned" si se quiere marcar directamente sin pasar por "InProgress"
+            if (Status == "InProgress" || Status == "Assigned")
             {
                 Status = "Completed";
                 CompletedAt = DateTime.UtcNow;
                 Progress = 100.00m;
 
-                // Calcular XP ganado
-                if (Quest != null && Hunter != null)
+                if (Quest == null)
                 {
-                    XPEarned = (int)(Quest.GetScaledXPReward(Hunter) * BonusMultiplier);
+                    XPEarned = 0;
+                    // Log para depuración (reemplaza con ILogger si lo inyectas/pasas)
+                    System.Diagnostics.Debug.WriteLine($"Warning: HunterDailyQuest.CompleteQuest - Quest object is null for AssignmentID {AssignmentID}. XP set to 0.");
+                    return;
                 }
+                if (Hunter == null)
+                {
+                    XPEarned = 0;
+                    System.Diagnostics.Debug.WriteLine($"Warning: HunterDailyQuest.CompleteQuest - Hunter object is null for AssignmentID {AssignmentID}. XP set to 0.");
+                    return;
+                }
+
+                // Log de valores antes del cálculo
+                System.Diagnostics.Debug.WriteLine($"Debug HunterDailyQuest.CompleteQuest for AssignmentID {AssignmentID}:");
+                System.Diagnostics.Debug.WriteLine($"  Quest.QuestName: {Quest.QuestName}, Quest.BaseXPReward: {Quest.BaseXPReward}");
+                System.Diagnostics.Debug.WriteLine($"  Hunter.Level: {Hunter.Level}");
+                int scaledReward = Quest.GetScaledXPReward(Hunter); // Calcular una vez
+                System.Diagnostics.Debug.WriteLine($"  ScaledXPReward before bonus: {scaledReward}");
+                System.Diagnostics.Debug.WriteLine($"  BonusMultiplier: {BonusMultiplier}");
+
+                XPEarned = (int)(scaledReward * BonusMultiplier);
+
+                System.Diagnostics.Debug.WriteLine($"  Calculated XPEarned: {XPEarned}");
             }
         }
 
