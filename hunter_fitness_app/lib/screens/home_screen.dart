@@ -15,34 +15,33 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final ApiService _apiService = ApiService();
 
-  Map<String, dynamic> _hunterProfile = {};
+  Map<String, dynamic> _hunterProfile = {}; // Ahora mutable
   List<dynamic> _dailyQuests = [];
   bool _isLoadingQuests = true;
   String? _questsErrorMessage;
   String _motivationalMessage = "Cargando mensajes del sistema...";
   String _progressMessage = "";
+  bool _isCompletingQuest = false;
 
 
   @override
   void initState() {
     super.initState();
     print("HomeScreen initState: ----- Entrando a initState -----");
-    print("HomeScreen initState: widget.hunterProfileData RECIBIDO: ${widget.hunterProfileData}");
-    print("HomeScreen initState: Tipo de widget.hunterProfileData: ${widget.hunterProfileData.runtimeType}");
-
+    // Usar una copia mutable del mapa para poder actualizarlo
     if (widget.hunterProfileData.isNotEmpty) {
-        _hunterProfile = Map<String, dynamic>.from(widget.hunterProfileData);
-        print("HomeScreen initState: _hunterProfile asignado y casteado CORRECTAMENTE.");
-        print("HomeScreen initState: _hunterProfile contenido: $_hunterProfile");
-         _loadDailyQuests();
+        _hunterProfile = Map<String, dynamic>.from(widget.hunterProfileData); // Copia para mutabilidad
+        print("HomeScreen initState: _hunterProfile asignado y copiado CORRECTAMENTE.");
+        _loadDailyQuests();
     } else {
-        print("HomeScreen initState: ADVERTENCIA - widget.hunterProfileData está vacío. _hunterProfile permanecerá vacío.");
-        // La UI de error en build() lo manejará.
+        print("HomeScreen initState: ADVERTENCIA - widget.hunterProfileData está vacío.");
     }
   }
 
   Future<void> _loadDailyQuests() async {
-    print("HomeScreen _loadDailyQuests: Iniciando carga de misiones.");
+    // ... (tu código existente de _loadDailyQuests, sin cambios necesarios aquí para XP/Level) ...
+    // Asegúrate que este método se mantenga como está para cargar las quests.
+     print("HomeScreen _loadDailyQuests: Iniciando carga de misiones.");
     if (!mounted) return;
     
     setState(() {
@@ -51,31 +50,25 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // ApiService._handleApiResponse devuelve un mapa donde 'data' contiene el DailyQuestsSummaryDto
       final Map<String, dynamic> questsResultFromService = await _apiService.getDailyQuests();
       print("HomeScreen _loadDailyQuests - questsResultFromService (del ApiService): $questsResultFromService");
 
       if (questsResultFromService['success'] == true) {
-        final dynamic summaryDataDynamic = questsResultFromService['data']; // Este es el DailyQuestsSummaryDto
+        final dynamic summaryDataDynamic = questsResultFromService['data']; 
         
         if (summaryDataDynamic is Map<String, dynamic>) {
           final Map<String, dynamic> summaryData = summaryDataDynamic;
           print("HomeScreen _loadDailyQuests - summaryData (contenido de 'data'): $summaryData");
-          print("HomeScreen _loadDailyQuests - summaryData Keys: ${summaryData.keys}");
 
-          // Intentar acceder a la lista de misiones con PascalCase "Quests" y luego camelCase "quests"
           List<dynamic>? questsListFromApi;
           if (summaryData.containsKey('Quests') && summaryData['Quests'] is List) {
             questsListFromApi = summaryData['Quests'] as List<dynamic>;
-            print("HomeScreen _loadDailyQuests: Lista 'Quests' (PascalCase) encontrada.");
           } else if (summaryData.containsKey('quests') && summaryData['quests'] is List) {
             questsListFromApi = summaryData['quests'] as List<dynamic>;
-            print("HomeScreen _loadDailyQuests: Lista 'quests' (camelCase) encontrada como fallback.");
           }
 
           final String apiMotivationalMessage = summaryData['MotivationalMessage'] as String? ?? summaryData['motivationalMessage'] as String? ?? "¡Entrena duro, Cazador!";
           final String apiProgressMessage = summaryData['ProgressMessage'] as String? ?? summaryData['progressMessage'] as String? ?? "";
-
 
           if (questsListFromApi != null) {
             if (mounted) {
@@ -86,16 +79,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 _progressMessage = apiProgressMessage;
                 if (_dailyQuests.isEmpty) {
                   _questsErrorMessage = summaryData['ProgressMessage'] as String? ?? '[SISTEMA] No hay misiones diarias asignadas para hoy.';
-                  print("HomeScreen _loadDailyQuests: Lista de misiones está vacía.");
-                } else {
-                  print("HomeScreen _loadDailyQuests: Misiones cargadas: ${_dailyQuests.length}");
                 }
               });
             }
           } else {
-            print("HomeScreen _loadDailyQuests: El campo de la lista de misiones ('Quests' o 'quests') NO se encontró o NO es una Lista dentro de summaryData.");
-            print("HomeScreen _loadDailyQuests: Tipo de summaryData['Quests']: ${summaryData['Quests']?.runtimeType}");
-            print("HomeScreen _loadDailyQuests: Tipo de summaryData['quests']: ${summaryData['quests']?.runtimeType}");
             if (mounted) {
               setState(() {
                 _questsErrorMessage = '[SISTEMA] Formato de lista de misiones inesperado desde la API.';
@@ -107,7 +94,6 @@ class _HomeScreenState extends State<HomeScreen> {
             }
           }
         } else {
-           print("HomeScreen _loadDailyQuests: questsResultFromService['data'] no es un Map. Tipo: ${summaryDataDynamic?.runtimeType}. Valor: $summaryDataDynamic");
            if (mounted) {
               setState(() {
                 _questsErrorMessage = '[SISTEMA] Formato de datos de resumen de misiones (summary) inesperado.';
@@ -123,7 +109,6 @@ class _HomeScreenState extends State<HomeScreen> {
             _isLoadingQuests = false;
             _dailyQuests = []; 
           });
-           print("HomeScreen _loadDailyQuests: Llamada a API no fue exitosa. Mensaje: ${questsResultFromService['message']}");
         }
       }
     } catch (e, s) {
@@ -139,8 +124,76 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
   
-  void _showSnackBar(String message, {bool isError = false}) {
+  // NUEVO: Método para simular/manejar la completación de un quest
+  Future<void> _handleCompleteQuest(String assignmentId) async {
     if (!mounted) return;
+    setState(() {
+      _isCompletingQuest = true;
+    });
+
+    // Simulación de datos de completación, en una app real esto vendría de la UI
+    final Map<String, dynamic> result = await _apiService.completeQuest(
+      assignmentId,
+      perfectExecution: true, // Ejemplo
+      // podrías pasar finalReps, finalSets, etc. si los tuvieras
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isCompletingQuest = false;
+    });
+
+    if (result['success'] == true) {
+      _showSnackBar(result['message'] ?? "¡Quest completado con éxito!", isError: false);
+
+      // Extraer datos de la respuesta para actualizar el perfil del cazador
+      final Map<String, dynamic>? questOperationData = result['data'] as Map<String, dynamic>?;
+
+      if (questOperationData != null) {
+        bool needsProfileUpdate = false;
+
+        if (mounted) {
+          setState(() {
+            if (questOperationData['newLevel'] != null) {
+              _hunterProfile['level'] = questOperationData['newLevel'];
+              needsProfileUpdate = true;
+            }
+            if (questOperationData['newCurrentXP'] != null) {
+              _hunterProfile['currentXP'] = questOperationData['newCurrentXP'];
+              needsProfileUpdate = true;
+            }
+            // El backend ya envía 'xpRequiredForNextLevel' con PascalCase en el perfil inicial,
+            // pero el DTO de QuestOperation usa 'NewXPRequiredForNextLevel'.
+            // Así que mantenemos la consistencia de la clave en _hunterProfile.
+            if (questOperationData['newXPRequiredForNextLevel'] != null) {
+              _hunterProfile['xpRequiredForNextLevel'] = questOperationData['newXPRequiredForNextLevel'];
+               // o _hunterProfile['XPRequiredForNextLevel'] si así lo usas consistentemente.
+              needsProfileUpdate = true;
+            }
+            if (questOperationData['newRank'] != null) {
+              _hunterProfile['hunterRank'] = questOperationData['newRank'];
+              needsProfileUpdate = true;
+            }
+            // Podrías añadir más campos si los necesitas, como LevelProgressPercentage
+
+             if (needsProfileUpdate) {
+                print("HomeScreen _handleCompleteQuest: Perfil del cazador actualizado localmente: $_hunterProfile");
+             }
+          });
+        }
+      }
+      // Recargar las quests para reflejar el estado 'Completed'
+      _loadDailyQuests();
+
+    } else {
+      _showSnackBar(result['message'] ?? "Error al completar la quest.", isError: true);
+    }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    // ... (tu código existente de _showSnackBar) ...
+     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message, style: TextStyle(color: isError ? Colors.white : Colors.black87, fontWeight: FontWeight.bold)),
@@ -152,6 +205,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ... (tu build method existente) ...
+    // Dentro de _buildDailyQuestsPanel, donde muestras cada quest, podrías añadir un botón
+    // para "Completar" que llame a _handleCompleteQuest.
+    // Este es un ejemplo muy básico de cómo podría ser:
+
+    // --- EJEMPLO de cómo integrar el botón de completar en _buildDailyQuestsPanel ---
+    // (Esto es conceptual, necesitarás integrarlo en tu lógica de renderizado de quests)
+    /*
+    if (quest['status']?.toString().toLowerCase() != 'completed') {
+      children.add(ElevatedButton(
+        onPressed: _isCompletingQuest 
+          ? null // Deshabilitar si ya se está completando una
+          : () => _handleCompleteQuest(quest['assignmentID'] as String),
+        child: _isCompletingQuest && _currentlyProcessingQuestId == quest['assignmentID'] 
+                ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
+                : Text('Completar Misión'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.greenAccent.shade700,
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          textStyle: TextStyle(fontSize: 12)
+        ),
+      ));
+    }
+    */
+    // El resto de tu método build se mantiene igual.
+    // Es importante que _hunterProfile ahora sea mutable y que `setState` reconstruya
+    // las partes de la UI que dependen de él (_buildHunterInfoCard, _buildStatsOverview).
+    // ...
     print("HomeScreen build: ----- Entrando al método build -----");
     
     if (_hunterProfile.isEmpty) {
@@ -162,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: const Text("Error de Perfil", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                 backgroundColor: Colors.grey[900]?.withOpacity(0.9),
                 elevation: 2,
-                automaticallyImplyLeading: false, // No mostrar botón de regreso
+                automaticallyImplyLeading: false, 
                  actions: [
                     IconButton(
                         icon: const Icon(Icons.logout, color: Color(0xFFFF8A80)),
@@ -226,11 +307,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     print("HomeScreen build: _hunterProfile tiene datos. HunterName: ${_hunterProfile['hunterName']}");
 
-    // Extracción segura de datos del perfil
     final String hunterName = _hunterProfile['hunterName']?.toString() ?? 'Cazador';
     final int level = int.tryParse(_hunterProfile['level']?.toString() ?? '1') ?? 1;
     final int currentXP = int.tryParse(_hunterProfile['currentXP']?.toString() ?? '0') ?? 0;
-    // El campo XPRequiredForNextLevel puede venir como 'xpRequiredForNextLevel' (camel) o 'XPRequiredForNextLevel' (Pascal)
     final int xpForNextLevel = int.tryParse(
                                   _hunterProfile['xpRequiredForNextLevel']?.toString() ?? 
                                   _hunterProfile['XPRequiredForNextLevel']?.toString() ?? 
@@ -259,7 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.lightBlueAccent),
             tooltip: 'Recargar Misiones',
-            onPressed: _isLoadingQuests ? null : _loadDailyQuests, // Deshabilitar si ya está cargando
+            onPressed: _isLoadingQuests ? null : _loadDailyQuests,
           ),
           IconButton(
             icon: const Icon(Icons.logout, color: Color(0xFFFF8A80)),
@@ -282,14 +361,13 @@ class _HomeScreenState extends State<HomeScreen> {
         color: Colors.lightBlueAccent,
         backgroundColor: Colors.grey[900],
         child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(), // Permitir scroll siempre para el RefreshIndicator
+          physics: const AlwaysScrollableScrollPhysics(), 
           padding: const EdgeInsets.all(12.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               _buildHunterInfoCard(hunterName, level, currentXP, xpForNextLevel, rank, xpProgress),
               const SizedBox(height: 16),
-               // Mensaje motivacional de la API
               if (_motivationalMessage.isNotEmpty && !_isLoadingQuests)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -319,10 +397,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-  }
+  } // Fin del método build
 
   Widget _buildSectionTitle(String title, IconData icon) {
-    return Padding(
+    // ... (código existente)
+     return Padding(
       padding: const EdgeInsets.only(bottom: 10.0, top: 8.0),
       child: Row(
         children: [
@@ -342,7 +421,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHunterInfoCard(String name, int level, int currentXP, int xpToNext, String rank, double xpProgress) {
-    return Card(
+    // ... (código existente)
+    // Asegúrate que este widget use los valores de _hunterProfile para que se actualice con setState
+     return Card(
       color: Colors.grey[900]?.withOpacity(0.85),
       elevation: 3,
       shape: RoundedRectangleBorder(
@@ -395,13 +476,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
  Widget _buildDailyQuestsPanel() {
-    if (_isLoadingQuests) {
+    // ... (código existente)
+    // Aquí es donde añadirías el botón para llamar a _handleCompleteQuest(quest['assignmentID'])
+    // por cada quest que no esté completada.
+     if (_isLoadingQuests) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 30.0),
         child: Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent))),
       );
     }
-    if (_questsErrorMessage != null && _dailyQuests.isEmpty) { // Mostrar error solo si no hay misiones que mostrar
+    if (_questsErrorMessage != null && _dailyQuests.isEmpty) { 
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 20.0),
         child: Center(
@@ -415,7 +499,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-    if (_dailyQuests.isEmpty) { // Si no hay error pero está vacío
+    if (_dailyQuests.isEmpty) { 
          return Padding(
             padding: const EdgeInsets.symmetric(vertical: 20.0),
             child: Center(
@@ -436,49 +520,32 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Column(
       children: _dailyQuests.map((questData) {
-        // Asegurarse que questData es un Map antes de intentar acceder a sus claves
         if (questData is! Map<String, dynamic>) { 
             print("HomeScreen _buildDailyQuestsPanel: questData no es un Map. Tipo: ${questData?.runtimeType}. Valor: $questData");
-            return const SizedBox.shrink(); // No renderizar nada si el formato es incorrecto
+            return const SizedBox.shrink(); 
         }
         final Map<String, dynamic> quest = questData;
-
-        // Extracción segura de datos del quest, usando PascalCase y camelCase como fallback
         final String questName = quest['questName']?.toString() ?? quest['QuestName']?.toString() ?? 'Misión Desconocida';
-        
-        // Para el progreso, intentar convertir de String si es necesario
         num currentProgNum = 0;
         dynamic progressValue = quest['progress'] ?? quest['Progress'];
-        if (progressValue is num) {
-          currentProgNum = progressValue;
-        } else if (progressValue is String) {
-          currentProgNum = num.tryParse(progressValue) ?? 0;
-        }
+        if (progressValue is num) currentProgNum = progressValue;
+        else if (progressValue is String) currentProgNum = num.tryParse(progressValue) ?? 0;
         final double progressFraction = (currentProgNum.toDouble() / 100.0).clamp(0.0, 1.0);
-        
         final String status = quest['status']?.toString() ?? quest['Status']?.toString() ?? 'Desconocido';
         final String targetDesc = quest['targetDescription']?.toString() ?? quest['TargetDescription']?.toString() ?? 'Completar la tarea asignada';
         final String difficultyColorHex = quest['difficultyColor']?.toString() ?? quest['DifficultyColor']?.toString() ?? '#757575';
         final String questTypeIcon = quest['questTypeIcon']?.toString() ?? quest['QuestTypeIcon']?.toString() ?? '⚡';
+        final String assignmentId = quest['assignmentID']?.toString() ?? quest['AssignmentID']?.toString() ?? '';
 
 
         Color statusColor = Colors.grey[600]!;
         try {
           statusColor = Color(int.parse(difficultyColorHex.replaceFirst('#', 'FF'), radix: 16));
         } catch (e) {
-          print("Error parsing difficultyColorHex: $difficultyColorHex. Error: $e");
-          statusColor = Colors.grey[600]!; // Fallback color
+          statusColor = Colors.grey[600]!;
         }
         
-        IconData statusIconData = Icons.radio_button_unchecked_outlined;
-
-        if (status.toLowerCase() == 'completed') {
-          statusIconData = Icons.check_circle_outline;
-          // Podríamos usar un color específico para completado si difficultyColor no es adecuado
-          // statusColor = Colors.greenAccent.shade400; 
-        } else if (status.toLowerCase() == 'inprogress') {
-          statusIconData = Icons.hourglass_empty_outlined;
-        }
+        bool isQuestCompleted = status.toLowerCase() == 'completed';
         
         return Card(
           color: Colors.grey[850]?.withOpacity(0.8),
@@ -494,8 +561,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Row(
                   children: [
-                    // Icon(statusIconData, color: statusColor, size: 20),
-                    Text(questTypeIcon, style: TextStyle(fontSize: 18, color: statusColor)), // Usar el icono de tipo de quest
+                    Text(questTypeIcon, style: TextStyle(fontSize: 18, color: statusColor)),
                     const SizedBox(width: 10),
                     Expanded(child: Text(questName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15))),
                     Text(status, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold))
@@ -519,6 +585,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text('${(progressFraction * 100).toStringAsFixed(0)}%', style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold)),
                   ],
                 ),
+                if (!isQuestCompleted && assignmentId.isNotEmpty) ...[ // Solo mostrar si no está completada y hay ID
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ElevatedButton(
+                      onPressed: _isCompletingQuest
+                          ? null // Deshabilitar si ya se está procesando otra quest
+                          : () => _handleCompleteQuest(assignmentId),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.greenAccent.shade700.withOpacity(0.8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))
+                      ),
+                      child: _isCompletingQuest && _hunterProfile['currentlyProcessingQuestId'] == assignmentId // Necesitarías un estado para esto
+                          ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
+                          : const Text('COMPLETAR'),
+                    ),
+                  ),
+                ]
               ],
             ),
           ),
@@ -528,6 +614,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStatsOverview(int str, int agi, int vit, int end) {
+    // ... (código existente)
+    // Asegúrate que este widget use los valores de _hunterProfile
     return Card(
       color: Colors.grey[900]?.withOpacity(0.85),
       elevation: 3,
@@ -551,7 +639,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStatItem(String name, int value, IconData icon, Color color) {
-    return Column(
+    // ... (código existente)
+     return Column(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         Icon(icon, color: color, size: 26),
@@ -564,7 +653,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildQuickActions() {
-    return Column(
+    // ... (código existente)
+     return Column(
       children: [
          _buildActionButton('Mis Misiones', Icons.list_alt_outlined, () {
             _showSnackBar('Función "Mis Misiones" (próximamente).');
@@ -582,6 +672,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildActionButton(String title, IconData icon, VoidCallback onPressed) {
+    // ... (código existente)
     return ElevatedButton.icon(
       icon: Icon(icon, size: 18, color: Colors.lightBlueAccent.withOpacity(0.8)),
       label: Text(title, style: TextStyle(color: Colors.lightBlueAccent.withOpacity(0.95))),

@@ -117,8 +117,9 @@ namespace HunterFitness.API.Models
             };
         }
 
-        public void UpdateRankBasedOnLevel()
+        public void UpdateRankBasedOnLevel() // Asegúrate que esto se llame si el nivel cambia
         {
+            string previousRank = HunterRank;
             HunterRank = Level switch
             {
                 >= 96 => "SSS",
@@ -130,17 +131,25 @@ namespace HunterFitness.API.Models
                 >= 11 => "D",
                 _ => "E"
             };
+            // Opcional: Log si el rango cambió
+            if (HunterRank != previousRank) {
+                Console.WriteLine($"Hunter {HunterName} ranked up to {HunterRank}!");
+            }
         }
 
         public void ProcessLevelUp()
         {
+            bool leveledUpThisCycle = false;
             while (CanLevelUp())
             {
                 var xpRequired = GetXPRequiredForNextLevel();
                 CurrentXP -= xpRequired;
                 Level++;
-                
-                // Actualizar rank automáticamente
+                leveledUpThisCycle = true; // Marcamos que al menos un nivel se subió
+            }
+            // Actualizar el rango solo si realmente hubo un cambio de nivel en este ciclo.
+            if (leveledUpThisCycle)
+            {
                 UpdateRankBasedOnLevel();
             }
         }

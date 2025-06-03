@@ -90,11 +90,17 @@ namespace HunterFitness.API.DTOs
     {
         public bool Success { get; set; }
         public string Message { get; set; } = string.Empty;
-        public HunterDailyQuestDto? Quest { get; set; }
+        public HunterDailyQuestDto? Quest { get; set; } // Quest afectado
+        
+        // Información de XP y Nivel del Hunter
         public int? XPEarned { get; set; }
         public bool LeveledUp { get; set; } = false;
         public int? NewLevel { get; set; }
+        public int? NewCurrentXP { get; set; }
+        public int? NewXPRequiredForNextLevel { get; set; }
         public string? NewRank { get; set; }
+        public decimal? NewLevelProgressPercentage { get; set; }
+
         public List<string> AchievementsUnlocked { get; set; } = new();
         public Dictionary<string, object> AdditionalData { get; set; } = new();
     }
