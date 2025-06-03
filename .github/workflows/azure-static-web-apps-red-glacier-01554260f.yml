@@ -1,0 +1,90 @@
+name: Azure Static Web Apps CI/CD for HunterFitness App # Nombre más descriptivo
+
+on:
+  push:
+    branches:
+      - master # Asegúrate que esta es tu rama principal (o cámbiala a 'main')
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - master # Asegúrate que esta es tu rama principal (o cámbiala a 'main')
+
+jobs:
+  build_and_deploy_job:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    name: Build and Deploy Job
+    permissions: # Los permisos son importantes para la autenticación OIDC y otras interacciones
+        id-token: write
+        contents: read
+    steps:
+      - uses: actions/checkout@v4 # Actualizado a v4 para buenas prácticas
+        with:
+          submodules: true
+          # lfs: true # Descomenta y pon a true si usas Git LFS para assets grandes
+
+      # ----- PASOS AÑADIDOS PARA FLUTTER -----
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.2' # CAMBIA '3.x' a tu versión específica de Flutter (ej. '3.19.0')
+          channel: 'stable'   # O el canal que uses (beta, dev)
+          cache: true         # Habilita el caché para acelerar compilaciones futuras
+
+      - name: Build Flutter Web App
+        working-directory: ./hunter_fitness_app # Define el directorio de trabajo para los comandos de Flutter
+        run: |
+          flutter pub get
+          flutter build web --release
+          # Opcional: Si necesitas un base-href específico, añádelo:
+          # flutter build web --release --base-href /
+          echo "Flutter web app built successfully. Output in ./build/web"
+      # ----- FIN DE PASOS AÑADIDOS PARA FLUTTER -----
+
+      # Pasos OIDC (generalmente SWA los maneja bien, si no, se pueden quitar si se usa solo el token API)
+      # Si el despliegue falla con OIDC, puedes intentar quitar estos dos pasos de OIDC
+      # y confiar solo en azure_static_web_apps_api_token.
+      - name: Install OIDC Client from Core Package
+        run: npm install @actions/core@1.6.0 @actions/http-client
+      - name: Get Id Token
+        uses: actions/github-script@v6
+        id: idtoken
+        with:
+          script: |
+            const coredemo = require('@actions/core')
+            return await coredemo.getIDToken()
+          result-encoding: string
+      
+      - name: Build And Deploy
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_RED_GLACIER_01554260F }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }} # Necesario para algunas integraciones de SWA con GitHub
+          action: "upload"
+          ###### Repository/Build Configurations ######
+          # app_location apunta AHORA a la carpeta donde están los archivos YA COMPILADOS por Flutter
+          app_location: "hunter_fitness_app/build/web"
+          api_location: "" # Correcto, ya que tu API es externa
+          # output_location es generalmente redundante si app_location ya apunta a la salida final del build.
+          # Puedes dejarlo vacío o quitarlo si app_location es la ruta final.
+          # Si lo dejas, asegúrate que sea coherente. El preset de SWA lo puso, así que podrías dejarlo.
+          output_location: "" # O quítalo, ya que app_location es ahora la salida directa. O mantenlo como hunter_fitness_app/build/web, pero es redundante.
+                              # Lo más simple es quitarlo si app_location ya es la carpeta de artefactos.
+                              # Para ser más explícito con la configuración que Azure te dio:
+                              # output_location: "hunter_fitness_app/build/web" <- Esto también estaría bien, SWA es flexible.
+                              # Pero la documentación de SWA para "Bring your own build" sugiere que app_location es la ruta a los artefactos.
+          github_id_token: ${{ steps.idtoken.outputs.result }} # Si se usa OIDC
+          ###### End of Repository/Build Configurations ######
+
+  close_pull_request_job:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    name: Close Pull Request Job
+    steps:
+      - name: Close Pull Request
+        id: closepullrequest
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_RED_GLACIER_01554260F }} # Token para cerrar el entorno de PR
+          action: "close"
